@@ -265,7 +265,8 @@ Push is the only notification channel. There is no email/LINE/SMS fallback.
 2. User taps the bell button — `Notification.requestPermission()` then
    `pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })`.
 3. The frontend POSTs `subscribePush` with the `endpoint` / `p256dh` / `auth`
-   to the Worker, which writes them to the `PushSubscriptions` sheet.
+   to the Worker, along with `role` and `deviceLabel`, and the Worker writes
+   them to the `PushSubscriptions` sheet.
 4. To send a notification the Worker iterates rows that match the target role
    (`child` / `parent`), encrypts the payload per RFC 8291, signs a per-endpoint
    VAPID JWT (`ES256`, `aud = origin of endpoint`, ~1h expiry), and POSTs to
@@ -316,10 +317,16 @@ giving "open the app → badge disappears" UX.
 
 ### `PushSubscriptions` sheet
 
-Auto-created on first send. Columns: `endpoint, p256dh, auth, user, role,
-createdAt, updatedAt`. Capped at `MAX_PUSH_SUBSCRIPTIONS` (50) rows; rows
-that 404/410 are cleared (cells emptied) but the row index remains so the
-range geometry stays stable.
+Auto-created on first send. Columns (fixed A:H order): `endpoint, p256dh,
+auth, user, role, deviceLabel, createdAt, updatedAt`.
+
+- Rows are interpreted by **column index**, not by header label.
+- For `role=parent`, `user` is intentionally stored as `""` so parent-mode
+  child switching does not leave stale parent/user pairings in the sheet.
+- New rows are written with explicit `PUT` to `A{n}:H{n}` (not `:append`) to
+  avoid Google Sheets table-anchor drift (e.g. accidental writes to G:N).
+- Capped at `MAX_PUSH_SUBSCRIPTIONS` (50) rows; rows that 404/410 are cleared
+  (cells emptied) but row indexes are kept stable.
 
 Re-keying VAPID requires deleting old rows: subscriptions remember the
 public key they were created with, and the push services reject sends

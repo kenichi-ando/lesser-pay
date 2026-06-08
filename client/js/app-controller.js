@@ -235,6 +235,7 @@
         state.parentPin = savedPin;
         state.parentMode = true;
         store.setParentMode(true);
+        await data.refreshPushSubscriptionRole();
         runtime.render();
         return true;
       } catch (_err) {
@@ -261,6 +262,7 @@
         state.parentMode = true;
         store.setParentPin(pin);
         store.setParentMode(true);
+        await data.refreshPushSubscriptionRole();
         els.parentModal.classList.add('hidden');
         hideUserSelection();
         runtime.render();

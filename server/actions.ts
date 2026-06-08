@@ -84,7 +84,7 @@ export const ACTIONS: Record<string, ActionDef> = {
 	subscribePush: {
 		requireUser: true,
 		handler: async (req, env) =>
-			handleSubscribePush(env, req.user as string, req.subscription, req.role),
+			handleSubscribePush(env, req.user as string, req.subscription, req.role, req.deviceLabel),
 	},
 	unsubscribePush: {
 		requireUser: false,
@@ -414,9 +414,10 @@ async function handleSubscribePush(
 	user: string,
 	subscription: unknown,
 	role: unknown,
+	deviceLabel: unknown,
 ) {
 	const normalized = normalizePushSubscription(subscription);
-	await upsertPushSubscription(env, user, normalized, role);
+	await upsertPushSubscription(env, user, normalized, role, deviceLabel);
 	return { subscribed: true };
 }
 

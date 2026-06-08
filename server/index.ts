@@ -55,7 +55,6 @@ async function dispatch(req: Request, env: Env): Promise<Response> {
 	} catch {
 		return json({ ok: false, error: "Invalid JSON body" }, 400);
 	}
-
 	// `redeemInvite` is the only action that runs without API_TOKEN. Everything
 	// else requires Authorization: Bearer <API_TOKEN>.
 	if (body.action === "redeemInvite") {

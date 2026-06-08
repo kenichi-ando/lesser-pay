@@ -3,7 +3,16 @@ import { getAccessToken } from "./api";
 import { b64url, b64urlBytes, formatDateTime } from "./util";
 
 const PUSH_SHEET = "PushSubscriptions";
-const PUSH_HEADERS = ["endpoint", "p256dh", "auth", "user", "role", "createdAt", "updatedAt"] as const;
+const PUSH_HEADERS = [
+	"endpoint",
+	"p256dh",
+	"auth",
+	"user",
+	"role",
+	"deviceLabel",
+	"createdAt",
+	"updatedAt",
+] as const;
 const MAX_PUSH_SUBSCRIPTIONS = 50;
 
 export interface PushSubscriptionInput {
@@ -20,6 +29,7 @@ interface StoredSubscription {
 	p256dh: string;
 	auth: string;
 	role: PushRole;
+	deviceLabel: string;
 }
 
 export type PushRole = "child" | "parent";
@@ -51,6 +61,7 @@ export async function upsertPushSubscription(
 	user: string,
 	subscription: PushSubscriptionInput,
 	roleRaw: unknown,
+	deviceLabelRaw?: unknown,
 ): Promise<void> {
 	if (!pushEnabled(env)) return;
 	const endpoint = String(subscription.endpoint ?? "").trim();
@@ -63,13 +74,32 @@ export async function upsertPushSubscription(
 	const rows = await readPushRows(env, token);
 	const now = formatDateTime(new Date());
 	const role = normalizePushRole(roleRaw);
+	const userForStorage = role === "parent" ? "" : user;
+	const deviceLabel = typeof deviceLabelRaw === "string" ? deviceLabelRaw.trim() : "";
 	const found = rows.find((r) => r.endpoint === endpoint);
 	if (found) {
-		await updatePushRow(env, token, found.rowIndex, [endpoint, p256dh, auth, user, role, now]);
+		await updatePushRow(env, token, found.rowIndex, [
+			endpoint,
+			p256dh,
+			auth,
+			userForStorage,
+			role,
+			deviceLabel,
+			now,
+		]);
 		return;
 	}
 	if (rows.length >= MAX_PUSH_SUBSCRIPTIONS) return;
-	await appendPushRow(env, token, [endpoint, p256dh, auth, user, role, now, now]);
+	await appendPushRow(env, token, [
+		endpoint,
+		p256dh,
+		auth,
+		userForStorage,
+		role,
+		deviceLabel,
+		now,
+		now,
+	]);
 }
 
 export async function removePushSubscription(env: Env, endpointRaw: unknown): Promise<void> {
@@ -407,7 +437,7 @@ async function hasPushSheet(env: Env, token: string): Promise<boolean> {
 }
 
 async function writePushHeaders(env: Env, token: string): Promise<void> {
-	const range = `${PUSH_SHEET}!A1:G1`;
+	const range = `${PUSH_SHEET}!A1:H1`;
 	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
 	await fetch(url, {
 		method: "PUT",
@@ -420,7 +450,7 @@ async function writePushHeaders(env: Env, token: string): Promise<void> {
 }
 
 async function readPushRows(env: Env, token: string): Promise<StoredSubscription[]> {
-	const range = `${PUSH_SHEET}!A2:G`;
+	const range = `${PUSH_SHEET}!A2:H`;
 	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}`;
 	const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 	if (!res.ok) return [];
@@ -432,7 +462,8 @@ async function readPushRows(env: Env, token: string): Promise<StoredSubscription
 			const p256dh = String(row[1] ?? "").trim();
 			const auth = String(row[2] ?? "").trim();
 			const role = normalizePushRole(row[4]);
-			return { rowIndex: i + 2, endpoint, p256dh, auth, role };
+			const deviceLabel = String(row[5] ?? "").trim();
+			return { rowIndex: i + 2, endpoint, p256dh, auth, role, deviceLabel };
 		})
 		.filter((row) => row.endpoint && row.p256dh && row.auth);
 }
@@ -440,12 +471,17 @@ async function readPushRows(env: Env, token: string): Promise<StoredSubscription
 async function appendPushRow(
 	env: Env,
 	token: string,
-	row: [string, string, string, string, PushRole, string, string],
+	row: [string, string, string, string, PushRole, string, string, string],
 ): Promise<void> {
-	const range = `${PUSH_SHEET}!A:G`;
-	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+	// Use explicit row update instead of :append so writes always land on A:H.
+	// Google Sheets append can anchor to a shifted table region (e.g. G:N).
+	const rows = await readPushRows(env, token);
+	const lastRow = rows.reduce((max, r) => Math.max(max, r.rowIndex), 1);
+	const nextRow = lastRow + 1;
+	const range = `${PUSH_SHEET}!A${nextRow}:H${nextRow}`;
+	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
 	await fetch(url, {
-		method: "POST",
+		method: "PUT",
 		headers: {
 			Authorization: `Bearer ${token}`,
 			"Content-Type": "application/json",
@@ -458,11 +494,11 @@ async function updatePushRow(
 	env: Env,
 	token: string,
 	rowIndex: number,
-	row: [string, string, string, string, PushRole, string],
+	row: [string, string, string, string, PushRole, string, string],
 ): Promise<void> {
-	const range = `${PUSH_SHEET}!A${rowIndex}:G${rowIndex}`;
+	const range = `${PUSH_SHEET}!A${rowIndex}:H${rowIndex}`;
 	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
-	const current = await readPushUpdatedAt(env, token, rowIndex);
+	const current = await readPushCreatedAt(env, token, rowIndex);
 	await fetch(url, {
 		method: "PUT",
 		headers: {
@@ -472,22 +508,31 @@ async function updatePushRow(
 		body: JSON.stringify({
 			range,
 			majorDimension: "ROWS",
-			values: [[row[0], row[1], row[2], row[3], row[4], current || row[5], row[5]]],
+			values: [[row[0], row[1], row[2], row[3], row[4], row[5], current || row[6], row[6]]],
 		}),
 	});
 }
 
-async function readPushUpdatedAt(env: Env, token: string, rowIndex: number): Promise<string> {
-	const range = `${PUSH_SHEET}!F${rowIndex}`;
-	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}`;
-	const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+async function readPushCreatedAt(env: Env, token: string, rowIndex: number): Promise<string> {
+	const createdAtRange = `${PUSH_SHEET}!G${rowIndex}`;
+	const createdAtUrl = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(createdAtRange)}`;
+	const createdAtRes = await fetch(createdAtUrl, { headers: { Authorization: `Bearer ${token}` } });
+	if (createdAtRes.ok) {
+		const body = (await createdAtRes.json()) as { values?: unknown[][] };
+		const createdAt = String(body.values?.[0]?.[0] ?? "");
+		if (createdAt) return createdAt;
+	}
+	// Backward compatibility for rows written before deviceLabel was added.
+	const legacyRange = `${PUSH_SHEET}!F${rowIndex}`;
+	const legacyUrl = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(legacyRange)}`;
+	const res = await fetch(legacyUrl, { headers: { Authorization: `Bearer ${token}` } });
 	if (!res.ok) return "";
 	const body = (await res.json()) as { values?: unknown[][] };
 	return String(body.values?.[0]?.[0] ?? "");
 }
 
 async function clearPushRow(env: Env, token: string, rowIndex: number): Promise<void> {
-	const range = `${PUSH_SHEET}!A${rowIndex}:G${rowIndex}`;
+	const range = `${PUSH_SHEET}!A${rowIndex}:H${rowIndex}`;
 	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
 	await fetch(url, {
 		method: "PUT",
@@ -498,7 +543,7 @@ async function clearPushRow(env: Env, token: string, rowIndex: number): Promise<
 		body: JSON.stringify({
 			range,
 			majorDimension: "ROWS",
-			values: [["", "", "", "", "", "", ""]],
+			values: [["", "", "", "", "", "", "", ""]],
 		}),
 	});
 }

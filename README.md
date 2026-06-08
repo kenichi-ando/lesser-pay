@@ -176,6 +176,17 @@ VAPID 鍵を後から差し替えた場合、過去の鍵で購読していた�
 
 サーバ側は RFC 8291 (aes128gcm) で `{title, body}` を暗号化したペイロードを送ります。Service Worker (`client/sw.js`) は通知受信ごとにバッジ件数を IndexedDB にインクリメント保持し、アプリをフォアグラウンドにすると自動でクリアされます。
 
+#### `PushSubscriptions` シート仕様
+
+`PushSubscriptions` は次の **8列固定** です（列名ではなく列順で判定）。
+
+`endpoint | p256dh | auth | user | role | deviceLabel | createdAt | updatedAt`
+
+- `role=parent` で保存するとき、`user` は空文字で保存します（親モード中の表示ユーザー切替で不整合を起こさないため）
+- `deviceLabel` は端末識別用の表示ラベルです（例: `iPhone / iOS / Safari`）
+- サーバは新規行追加時に `A:H` の次行へ直接 `PUT` するため、Sheets の `append` による列ずれ（例: G:N へ書き込まれる問題）を回避しています
+- 既存シートを移行する場合は、まず `PushSubscriptions` の実データを `A:H` に揃えてください
+
 ## 家族向け：PWA としてホーム画面に追加 (必須)
 
 LesserPay は **PWA としてホーム画面から起動することを前提に作っています**。とくに iOS は PWA としてインストールしないとプッシュ通知が一切届きません。Android も PWA で起動したほうがブラウザのアドレスバー等が消えてアプリらしい見た目になります。

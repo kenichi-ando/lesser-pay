@@ -68,6 +68,25 @@
       return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
     }
 
+    function getDeviceLabel() {
+      const ua = navigator.userAgent || '';
+      const isIpad = /iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const isIphone = /iPhone/.test(ua);
+      const isAndroid = /Android/.test(ua);
+      const isMobile = /Mobile/.test(ua);
+      const isMac = /Macintosh|Mac OS X/.test(ua) && !isIpad;
+      const isWindows = /Windows NT/.test(ua);
+
+      const deviceType = isIpad ? 'iPad' : isIphone ? 'iPhone' : isAndroid ? (isMobile ? 'Android Phone' : 'Android Tablet') : isMobile ? 'Mobile' : 'Desktop';
+      const os = isIpad ? 'iPadOS' : isIphone ? 'iOS' : isAndroid ? 'Android' : isWindows ? 'Windows' : isMac ? 'macOS' : 'Unknown OS';
+      const browser = /Edg\//.test(ua) ? 'Edge'
+        : /Chrome\//.test(ua) && !/Edg\//.test(ua) ? 'Chrome'
+          : /Firefox\//.test(ua) ? 'Firefox'
+            : /Safari\//.test(ua) && !/Chrome\//.test(ua) && !/Edg\//.test(ua) ? 'Safari'
+              : 'Unknown Browser';
+      return deviceType + ' / ' + os + ' / ' + browser;
+    }
+
     async function ensureServiceWorker() {
       const reg = await navigator.serviceWorker.getRegistration('/');
       if (reg) return reg;
@@ -82,6 +101,7 @@
       const auth = current.getKey('auth');
       await api('subscribePush', {
         role: state.parentMode ? 'parent' : 'child',
+        deviceLabel: getDeviceLabel(),
         subscription: {
           endpoint: current.endpoint,
           keys: {
