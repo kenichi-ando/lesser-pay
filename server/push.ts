@@ -28,6 +28,7 @@ interface StoredSubscription {
 	endpoint: string;
 	p256dh: string;
 	auth: string;
+	user: string;
 	role: PushRole;
 	deviceLabel: string;
 }
@@ -78,6 +79,13 @@ export async function upsertPushSubscription(
 	const deviceLabel = typeof deviceLabelRaw === "string" ? deviceLabelRaw.trim() : "";
 	const found = rows.find((r) => r.endpoint === endpoint);
 	if (found) {
+		const isSameAsStored =
+			found.p256dh === p256dh &&
+			found.auth === auth &&
+			found.user === userForStorage &&
+			found.role === role &&
+			found.deviceLabel === deviceLabel;
+		if (isSameAsStored) return;
 		await updatePushRow(env, token, found.rowIndex, [
 			endpoint,
 			p256dh,
@@ -119,6 +127,7 @@ export async function notifyViaPush(
 	title: string,
 	body: string,
 	targetRole?: PushRole,
+	targetUser?: string,
 ): Promise<void> {
 	if (!pushEnabled(env)) return;
 	const token = await getAccessToken(env);
@@ -129,6 +138,7 @@ export async function notifyViaPush(
 	const deduped = new Map<string, StoredSubscription>();
 	for (const row of rows) {
 		if (targetRole && row.role !== targetRole) continue;
+		if (targetUser && row.user !== targetUser) continue;
 		deduped.set(row.endpoint, row);
 	}
 
@@ -461,9 +471,10 @@ async function readPushRows(env: Env, token: string): Promise<StoredSubscription
 			const endpoint = String(row[0] ?? "").trim();
 			const p256dh = String(row[1] ?? "").trim();
 			const auth = String(row[2] ?? "").trim();
+			const user = String(row[3] ?? "").trim();
 			const role = normalizePushRole(row[4]);
 			const deviceLabel = String(row[5] ?? "").trim();
-			return { rowIndex: i + 2, endpoint, p256dh, auth, role, deviceLabel };
+			return { rowIndex: i + 2, endpoint, p256dh, auth, user, role, deviceLabel };
 		})
 		.filter((row) => row.endpoint && row.p256dh && row.auth);
 }

@@ -37,7 +37,7 @@ window.LESSERPAY_STRINGS = {
     loading: '読み込み中…',
     apply: '完了報告',
     resubmit: '↻ 再提出',
-    applying: '送信中…',
+    processing: '処理中…',
     approve: '✓ 承認',
     reject: '✏️ 訂正依頼',
     appliedBadge: '申請中',

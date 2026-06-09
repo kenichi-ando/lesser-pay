@@ -152,12 +152,16 @@ async function handleApplyTask(env: Env, user: string, taskId: string) {
 	// apply — the +/- pair cancels out.
 	const isFirstSubmit = currentStatus !== STATUS.RETURNED;
 
+	const historyDate = formatDateTime(new Date());
+	let history: { date: string; content: string; points: number } | null = null;
 	if (isFirstSubmit && submitReward > 0) {
+		const historyContent = HISTORY_LABEL.SUBMIT_PREFIX + taskLabel;
 		await appendHistoryRow(env, token, historySheet, [
-			formatDateTime(new Date()),
-			HISTORY_LABEL.SUBMIT_PREFIX + taskLabel,
+			historyDate,
+			historyContent,
 			submitReward,
 		]);
+		history = { date: historyDate, content: historyContent, points: submitReward };
 	}
 
 	await casTaskStatus(env, token, tasksSheet, rowIndex, currentStatus, STATUS.SUBMITTED);
@@ -179,7 +183,7 @@ async function handleApplyTask(env: Env, user: string, taskId: string) {
 		);
 	}
 
-	return { taskId };
+	return { taskId, status: STATUS.SUBMITTED, history };
 }
 
 // "category title" with empty parts skipped. Used both for history CONTENT
@@ -234,11 +238,8 @@ async function handleApproveTask(env: Env, user: string, taskId: string, pin: un
 	// after the history append leaves the task still SUBMITTED (visible to the
 	// parent), which is recoverable. The reverse order would risk "approved
 	// without payout" — much harder to spot.
-	await appendHistoryRow(env, token, historySheet, [
-		formatDateTime(new Date()),
-		content,
-		points,
-	]);
+	const historyDate = formatDateTime(new Date());
+	await appendHistoryRow(env, token, historySheet, [historyDate, content, points]);
 	await casTaskStatus(env, token, tasksSheet, rowIndex, currentStatus, STATUS.APPROVED);
 	const balance = total + points;
 
@@ -249,9 +250,15 @@ async function handleApproveTask(env: Env, user: string, taskId: string, pin: un
 		fmt(MSG.notifySubjectApprove, { user: displayName }),
 		fmt(MSG.notifyApproveBody, { user: displayName, label: taskLabel, pt: points, balance }),
 		"child",
+		user,
 	);
 
-	return { taskId, points };
+	return {
+		taskId,
+		status: STATUS.APPROVED,
+		points,
+		history: { date: historyDate, content, points },
+	};
 }
 
 async function handleCashout(
@@ -274,11 +281,8 @@ async function handleCashout(
 	if (amt > total) {
 		throw new HttpError(409, fmt(MSG.errInsufficientBalance, { total }));
 	}
-	await appendHistoryRow(env, token, historySheet, [
-		formatDateTime(new Date()),
-		HISTORY_LABEL.CASHOUT,
-		-amt,
-	]);
+	const historyDate = formatDateTime(new Date());
+	await appendHistoryRow(env, token, historySheet, [historyDate, HISTORY_LABEL.CASHOUT, -amt]);
 	const balance = total - amt;
 
 	const cfg = fetchConfig(env);
@@ -288,9 +292,14 @@ async function handleCashout(
 		fmt(MSG.notifySubjectCashout, { user: displayName }),
 		fmt(MSG.notifyCashoutBody, { user: displayName, amount: amt, balance }),
 		"child",
+		user,
 	);
 
-	return { amount: amt, balance };
+	return {
+		amount: amt,
+		balance,
+		history: { date: historyDate, content: HISTORY_LABEL.CASHOUT, points: -amt },
+	};
 }
 
 async function handleGrantBonus(
@@ -319,11 +328,9 @@ async function handleGrantBonus(
 	// family-scale traffic).
 	const rows = await readHistoryRows(env, token, historySheet);
 	const total = rows.reduce((s, h) => s + (toNumber(h.points) || 0), 0);
-	await appendHistoryRow(env, token, historySheet, [
-		formatDateTime(new Date()),
-		HISTORY_LABEL.BONUS_PREFIX + label,
-		amt,
-	]);
+	const historyDate = formatDateTime(new Date());
+	const historyContent = HISTORY_LABEL.BONUS_PREFIX + label;
+	await appendHistoryRow(env, token, historySheet, [historyDate, historyContent, amt]);
 	const balance = total + amt;
 
 	const cfg = fetchConfig(env);
@@ -333,9 +340,14 @@ async function handleGrantBonus(
 		fmt(MSG.notifySubjectBonus, { user: displayName }),
 		fmt(MSG.notifyBonusBody, { user: displayName, label, amount: amt, balance }),
 		"child",
+		user,
 	);
 
-	return { amount: amt, balance };
+	return {
+		amount: amt,
+		balance,
+		history: { date: historyDate, content: historyContent, points: amt },
+	};
 }
 
 async function handleRejectTask(
@@ -368,9 +380,10 @@ async function handleRejectTask(
 		fmt(MSG.notifySubjectReject, { user: displayName }),
 		fmt(MSG.notifyRejectBody, { user: displayName, label: taskLabel }),
 		"child",
+		user,
 	);
 
-	return { taskId };
+	return { taskId, status: STATUS.RETURNED };
 }
 
 async function handleWithdrawTask(env: Env, user: string, taskId: string) {
@@ -399,14 +412,21 @@ async function handleWithdrawTask(env: Env, user: string, taskId: string) {
 	// Append before flipping status: a partial failure that stops here leaves
 	// the task in SUBMITTED, which is recoverable; the reverse order would
 	// produce a withdrawn task with no compensating history.
+	const historyDate = formatDateTime(new Date());
+	const historyPoints = submitReward > 0 ? -submitReward : 0;
+	const historyContent = HISTORY_LABEL.WITHDRAW_PREFIX + taskLabel;
 	await appendHistoryRow(env, token, historySheet, [
-		formatDateTime(new Date()),
-		HISTORY_LABEL.WITHDRAW_PREFIX + taskLabel,
-		submitReward > 0 ? -submitReward : 0,
+		historyDate,
+		historyContent,
+		historyPoints,
 	]);
 	await casTaskStatus(env, token, tasksSheet, rowIndex, currentStatus, STATUS.PENDING);
 
-	return { taskId };
+	return {
+		taskId,
+		status: STATUS.PENDING,
+		history: { date: historyDate, content: historyContent, points: historyPoints },
+	};
 }
 
 async function handleSubscribePush(

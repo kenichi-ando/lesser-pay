@@ -8,6 +8,7 @@
     const tr = deps.tr;
     const escapeHtml = deps.escapeHtml;
     const runtime = deps.runtime;
+    const withBusy = deps.withBusy;
 
     function userKeys() {
       return state.serverUsers.map(function (u) { return u.key; });
@@ -226,6 +227,14 @@
       setTimeout(function () { els.parentPin.focus(); }, 50);
     }
 
+    async function runSubmitWithBusy(button, processingLabel, submitTask, onError) {
+      try {
+        await withBusy(button, { label: processingLabel }, submitTask);
+      } catch (err) {
+        if (typeof onError === 'function') onError(err);
+      }
+    }
+
     async function tryAutoLoginParent() {
       if (state.parentMode) return true;
       const savedPin = store.getParentPin();
@@ -253,31 +262,30 @@
         els.parentError.classList.remove('hidden');
         return;
       }
-      els.parentSubmit.disabled = true;
-      const original = els.parentSubmit.textContent;
-      els.parentSubmit.textContent = tr('parent.checking');
-      try {
-        await data.api('verifyPin', { pin: pin });
-        state.parentPin = pin;
-        state.parentMode = true;
-        store.setParentPin(pin);
-        store.setParentMode(true);
-        await data.refreshPushSubscriptionRole();
-        els.parentModal.classList.add('hidden');
-        hideUserSelection();
-        runtime.render();
-        if (state.pendingParentSwitchToast) {
-          actions.toast(tr('users.switchedParentToast'), 'success');
+      await runSubmitWithBusy(
+        els.parentSubmit,
+        tr('parent.checking'),
+        async function () {
+          await data.api('verifyPin', { pin: pin });
+          state.parentPin = pin;
+          state.parentMode = true;
+          store.setParentPin(pin);
+          store.setParentMode(true);
+          await data.refreshPushSubscriptionRole();
+          els.parentModal.classList.add('hidden');
+          hideUserSelection();
+          runtime.render();
+          if (state.pendingParentSwitchToast) {
+            actions.toast(tr('users.switchedParentToast'), 'success');
+          }
+        },
+        function (err) {
+          state.parentPin = null;
+          els.parentError.textContent = err.message;
+          els.parentError.classList.remove('hidden');
         }
-      } catch (err) {
-        state.parentPin = null;
-        els.parentError.textContent = err.message;
-        els.parentError.classList.remove('hidden');
-      } finally {
-        state.pendingParentSwitchToast = false;
-        els.parentSubmit.disabled = false;
-        els.parentSubmit.textContent = original;
-      }
+      );
+      state.pendingParentSwitchToast = false;
     }
 
     function closeParentModal() {
@@ -299,7 +307,8 @@
       openParentModal: openParentModal,
       tryAutoLoginParent: tryAutoLoginParent,
       toast: function (msg, kind) { actions.toast(msg, kind); },
-      onTasksApproved: function () { actions.celebrateRemoteApprovals(); }
+      onTasksApproved: function () { actions.celebrateRemoteApprovals(); },
+      withBusy: withBusy
     });
 
     const actions = window.LESSERPAY_CONTROLLER_ACTIONS.create({
@@ -308,7 +317,8 @@
       tr: tr,
       api: data.api,
       loadData: data.loadData,
-      clearDataCache: data.clearDataCache
+      clearDataCache: data.clearDataCache,
+      withBusy: withBusy
     });
 
     return {

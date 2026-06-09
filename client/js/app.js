@@ -13,6 +13,7 @@
   const formatDate = utils.formatDate;
   const isExpired = utils.isExpired;
   const formatMinutes = utils.formatMinutes;
+  const withBusy = utils.withBusy;
 
   let STATUS = /** @type {Record<string,string>} */ ({});
   const state = {
@@ -90,6 +91,7 @@
     tr: tr,
     escapeHtml: escapeHtml,
     runtime: runtime,
+    withBusy: withBusy,
     getStatus: function () { return STATUS; },
     setStatus: function (status) { STATUS = status; },
     openSettings: function () { openSettingsModal(); }
@@ -197,9 +199,12 @@
 
   async function onTogglePush() {
     if (!controller.isPushSupported()) return;
-    if (controller.isPushEnabled()) await controller.disablePush();
-    else await controller.enablePush();
-    syncSettingsToggles();
+    if (!els.settingsPushRow) return;
+    await withBusy(els.settingsPushRow, {}, async function () {
+      if (controller.isPushEnabled()) await controller.disablePush();
+      else await controller.enablePush();
+      syncSettingsToggles();
+    });
   }
 
   function onToggleSound() {

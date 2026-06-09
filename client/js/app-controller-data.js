@@ -8,6 +8,7 @@
     const tr = deps.tr;
     const runtime = deps.runtime;
     const setStatus = deps.setStatus;
+    const withBusy = deps.withBusy;
     let pushSubscribed = false;
 
     let dataCache = null;
@@ -397,32 +398,28 @@
           error.classList.remove('hidden');
           return;
         }
-        submitBtn.disabled = true;
-        const originalLabel = submitBtn.textContent;
-        submitBtn.textContent = tr('locked.submitting');
         try {
-          const res = await fetch(CONFIG.API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'redeemInvite', code: code })
+          await withBusy(submitBtn, { label: tr('locked.submitting') }, async function () {
+            const res = await fetch(CONFIG.API_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'redeemInvite', code: code })
+            });
+            let data = null;
+            try { data = await res.json(); } catch (_e) {}
+            if (!res.ok || !data || !data.ok || typeof data.apiToken !== 'string') {
+              error.textContent = res.status === 401
+                ? tr('locked.invalidCode')
+                : tr('errors.network') + ' (' + res.status + ')';
+              error.classList.remove('hidden');
+              return;
+            }
+            store.setApiToken(data.apiToken);
+            location.reload();
           });
-          let data = null;
-          try { data = await res.json(); } catch (_e) {}
-          if (!res.ok || !data || !data.ok || typeof data.apiToken !== 'string') {
-            error.textContent = res.status === 401
-              ? tr('locked.invalidCode')
-              : tr('errors.network') + ' (' + res.status + ')';
-            error.classList.remove('hidden');
-            return;
-          }
-          store.setApiToken(data.apiToken);
-          location.reload();
         } catch (_err) {
           error.textContent = tr('errors.network');
           error.classList.remove('hidden');
-        } finally {
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalLabel;
         }
       };
       panel.querySelector('#locked-token-open').onclick = function () {

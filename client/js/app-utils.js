@@ -52,12 +52,47 @@
       return tr('time.minute', { m: r });
     }
 
+    async function withBusy(targets, options, task) {
+      const opts = options || {};
+      const nodes = (Array.isArray(targets) ? targets : [targets]).filter(Boolean);
+      const states = nodes.map(function (node) {
+        return {
+          node: node,
+          disabled: !!node.disabled,
+          ariaBusy: node.getAttribute('aria-busy')
+        };
+      });
+      const labelNode = opts.labelNode || nodes[0] || null;
+      const hasLabel = typeof opts.label === 'string';
+      const originalLabel = hasLabel && labelNode ? labelNode.textContent : '';
+
+      states.forEach(function (state) {
+        state.node.disabled = true;
+        state.node.classList.add('is-loading');
+        state.node.setAttribute('aria-busy', 'true');
+      });
+      if (hasLabel && labelNode) labelNode.textContent = opts.label;
+
+      try {
+        return await task();
+      } finally {
+        states.forEach(function (state) {
+          state.node.disabled = state.disabled;
+          state.node.classList.remove('is-loading');
+          if (state.ariaBusy == null) state.node.removeAttribute('aria-busy');
+          else state.node.setAttribute('aria-busy', state.ariaBusy);
+        });
+        if (hasLabel && labelNode) labelNode.textContent = originalLabel;
+      }
+    }
+
     return {
       escapeHtml: escapeHtml,
       parseDate: parseDate,
       formatDate: formatDate,
       isExpired: isExpired,
-      formatMinutes: formatMinutes
+      formatMinutes: formatMinutes,
+      withBusy: withBusy
     };
   }
 

@@ -6,6 +6,7 @@
     const els = deps.els;
     const tr = deps.tr;
     const sound = window.LESSERPAY_SOUND || { play: function () {} };
+    const withBusy = deps.withBusy;
 
     function flashRow(btn) {
       const row = btn && btn.closest ? btn.closest('.task-item') : null;
@@ -81,86 +82,109 @@
       }, 2800);
     }
 
+    function taskButtons(id) {
+      return Array.from(document.querySelectorAll('[data-task-id]')).filter(function (node) {
+        return node.dataset.taskId === id;
+      });
+    }
+
+    function setTaskStatusById(id, nextStatus) {
+      const targetId = String(id);
+      for (let i = 0; i < state.tasks.length; i++) {
+        if (String(state.tasks[i].id) === targetId) {
+          state.tasks[i].status = nextStatus;
+          return;
+        }
+      }
+    }
+
+    async function runTaskAction(btn, id, config) {
+      if (!confirm(tr(config.confirmKey))) return;
+      try {
+        await withBusy(taskButtons(id), { label: tr('tasks.processing'), labelNode: btn }, async function () {
+          const payload = { taskId: id };
+          if (config.requiresPin) payload.pin = state.parentPin;
+          await deps.api(config.apiAction, payload);
+          if (config.successStatus) {
+            setTaskStatusById(id, config.successStatus);
+          }
+          sound.play(config.soundKey);
+          flashRow(btn);
+          if (typeof config.afterSuccess === 'function') config.afterSuccess(btn);
+          toast(tr(config.toastKey), config.toastKind);
+          deps.clearDataCache();
+          await deps.loadData(true);
+        });
+      } catch (err) {
+        sound.play('error');
+        toast(err.message, 'error');
+      }
+    }
+
+    async function runModalSubmit(config) {
+      try {
+        await withBusy(config.submitButton, { label: tr(config.processingKey) }, async function () {
+          await deps.api(config.apiAction, config.payload());
+          config.onSuccess();
+          deps.clearDataCache();
+          await deps.loadData(true);
+        });
+      } catch (err) {
+        config.onError(err);
+      }
+    }
+
     async function onTaskAction(e) {
       const btn = e.currentTarget;
       const id = btn.dataset.taskId;
       const action = btn.dataset.action;
-
       if (action === 'apply') {
-        if (!confirm(tr('tasks.confirmApply'))) return;
-        const original = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = tr('tasks.applying');
-        try {
-          await deps.api('applyTask', { taskId: id });
-          sound.play('apply');
-          flashRow(btn);
-          toast(tr('tasks.toastApplied'), 'success');
-          deps.clearDataCache();
-          await deps.loadData(true);
-        } catch (err) {
-          sound.play('error');
-          toast(err.message, 'error');
-          btn.disabled = false;
-          btn.textContent = original;
-        }
+        await runTaskAction(btn, id, {
+          confirmKey: 'tasks.confirmApply',
+          apiAction: 'applyTask',
+          successStatus: 'Submitted',
+          soundKey: 'apply',
+          toastKey: 'tasks.toastApplied',
+          toastKind: 'success'
+        });
         return;
       }
-
       if (action === 'approve') {
-        if (!confirm(tr('tasks.confirmApprove'))) return;
-        btn.disabled = true;
-        try {
-          await deps.api('approveTask', { taskId: id, pin: state.parentPin });
-          sound.play('approve');
-          flashRow(btn);
-          confettiBurst(btn);
-          cheerLogo();
-          popBalance();
-          toast(tr('tasks.toastApproved'), 'success');
-          deps.clearDataCache();
-          await deps.loadData(true);
-        } catch (err) {
-          sound.play('error');
-          toast(err.message, 'error');
-          btn.disabled = false;
-        }
+        await runTaskAction(btn, id, {
+          confirmKey: 'tasks.confirmApprove',
+          apiAction: 'approveTask',
+          requiresPin: true,
+          successStatus: 'Approved',
+          soundKey: 'approve',
+          toastKey: 'tasks.toastApproved',
+          toastKind: 'success',
+          afterSuccess: function (targetBtn) {
+            confettiBurst(targetBtn);
+            cheerLogo();
+            popBalance();
+          }
+        });
         return;
       }
-
       if (action === 'reject') {
-        if (!confirm(tr('tasks.confirmReject'))) return;
-        btn.disabled = true;
-        try {
-          await deps.api('rejectTask', { taskId: id, pin: state.parentPin });
-          sound.play('reject');
-          flashRow(btn);
-          toast(tr('tasks.toastRejected'));
-          deps.clearDataCache();
-          await deps.loadData(true);
-        } catch (err) {
-          sound.play('error');
-          toast(err.message, 'error');
-          btn.disabled = false;
-        }
+        await runTaskAction(btn, id, {
+          confirmKey: 'tasks.confirmReject',
+          apiAction: 'rejectTask',
+          requiresPin: true,
+          successStatus: 'Returned',
+          soundKey: 'reject',
+          toastKey: 'tasks.toastRejected'
+        });
         return;
       }
-
       if (action === 'withdraw') {
-        if (!confirm(tr('tasks.confirmWithdraw'))) return;
-        btn.disabled = true;
-        try {
-          await deps.api('withdrawTask', { taskId: id });
-          sound.play('reject');
-          flashRow(btn);
-          toast(tr('tasks.toastWithdrawn'));
-          deps.clearDataCache();
-          await deps.loadData(true);
-        } catch (err) {
-          sound.play('error');
-          toast(err.message, 'error');
-          btn.disabled = false;
-        }
+        await runTaskAction(btn, id, {
+          confirmKey: 'tasks.confirmWithdraw',
+          apiAction: 'withdrawTask',
+          successStatus: 'Pending',
+          soundKey: 'reject',
+          toastKey: 'tasks.toastWithdrawn'
+        });
       }
     }
 
@@ -187,24 +211,23 @@
         return;
       }
       if (!confirm(tr('cashout.confirm', { amount: amount }))) return;
-      els.cashoutSubmit.disabled = true;
-      els.cashoutSubmit.textContent = tr('cashout.processing');
-      try {
-        await deps.api('cashout', { amount: amount, pin: state.parentPin });
-        els.cashoutModal.classList.add('hidden');
-        sound.play('cashout');
-        confettiBurst(document.querySelector('.balance-number'));
-        popBalance();
-        toast(tr('cashout.toast', { amount: amount }), 'success');
-        deps.clearDataCache();
-        await deps.loadData(true);
-      } catch (err) {
-        els.cashoutError.textContent = err.message;
-        els.cashoutError.classList.remove('hidden');
-      } finally {
-        els.cashoutSubmit.disabled = false;
-        els.cashoutSubmit.textContent = tr('cashout.submit');
-      }
+      await runModalSubmit({
+        submitButton: els.cashoutSubmit,
+        processingKey: 'cashout.processing',
+        apiAction: 'cashout',
+        payload: function () { return { amount: amount, pin: state.parentPin }; },
+        onSuccess: function () {
+          els.cashoutModal.classList.add('hidden');
+          sound.play('cashout');
+          confettiBurst(document.querySelector('.balance-number'));
+          popBalance();
+          toast(tr('cashout.toast', { amount: amount }), 'success');
+        },
+        onError: function (err) {
+          els.cashoutError.textContent = err.message;
+          els.cashoutError.classList.remove('hidden');
+        }
+      });
     }
 
     function openBonusModal() {
@@ -229,25 +252,24 @@
         return;
       }
       if (!confirm(tr('bonus.confirm', { label: label, amount: amount }))) return;
-      els.bonusSubmit.disabled = true;
-      els.bonusSubmit.textContent = tr('bonus.processing');
-      try {
-        await deps.api('grantBonus', { label: label, amount: amount, pin: state.parentPin });
-        els.bonusModal.classList.add('hidden');
-        sound.play('approve');
-        confettiBurst(document.querySelector('.balance-number'));
-        cheerLogo();
-        popBalance();
-        toast(tr('bonus.toast', { amount: amount }), 'success');
-        deps.clearDataCache();
-        await deps.loadData(true);
-      } catch (err) {
-        els.bonusError.textContent = err.message;
-        els.bonusError.classList.remove('hidden');
-      } finally {
-        els.bonusSubmit.disabled = false;
-        els.bonusSubmit.textContent = tr('bonus.submit');
-      }
+      await runModalSubmit({
+        submitButton: els.bonusSubmit,
+        processingKey: 'bonus.processing',
+        apiAction: 'grantBonus',
+        payload: function () { return { label: label, amount: amount, pin: state.parentPin }; },
+        onSuccess: function () {
+          els.bonusModal.classList.add('hidden');
+          sound.play('approve');
+          confettiBurst(document.querySelector('.balance-number'));
+          cheerLogo();
+          popBalance();
+          toast(tr('bonus.toast', { amount: amount }), 'success');
+        },
+        onError: function (err) {
+          els.bonusError.textContent = err.message;
+          els.bonusError.classList.remove('hidden');
+        }
+      });
     }
 
     // Fired when loadData detects tasks that flipped Submitted → Approved

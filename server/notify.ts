@@ -12,6 +12,7 @@ export async function notify(
 	subject: string,
 	body: string,
 	targetRole?: PushRole,
+	targetUser?: string,
 ): Promise<void> {
-	await notifyViaPush(env, subject, body, targetRole);
+	await notifyViaPush(env, subject, body, targetRole, targetUser);
 }
