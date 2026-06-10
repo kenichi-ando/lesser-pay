@@ -128,17 +128,20 @@ export async function notifyViaPush(
 	body: string,
 	targetRole?: PushRole,
 	targetUser?: string,
+	targetEndpointRaw?: string,
 ): Promise<void> {
 	if (!pushEnabled(env)) return;
 	const token = await getAccessToken(env);
 	await ensurePushSheet(env, token);
 	const rows = await readPushRows(env, token);
 	if (rows.length === 0) return;
+	const targetEndpoint = String(targetEndpointRaw ?? "").trim();
 
 	const deduped = new Map<string, StoredSubscription>();
 	for (const row of rows) {
 		if (targetRole && row.role !== targetRole) continue;
 		if (targetUser && row.user !== targetUser) continue;
+		if (targetEndpoint && row.endpoint !== targetEndpoint) continue;
 		deduped.set(row.endpoint, row);
 	}
 

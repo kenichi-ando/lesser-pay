@@ -167,7 +167,7 @@ async function handleApplyTask(env: Env, user: string, taskId: string) {
 	await casTaskStatus(env, token, tasksSheet, rowIndex, currentStatus, STATUS.SUBMITTED);
 
 	// Notification — best effort; never break the user flow.
-	// Debug user submissions are silent so they don't disturb real parent devices.
+	// Debug user apply notifications are sent only to DEBUG_ENDPOINT parent device.
 	const cfg = fetchConfig(env);
 	const displayName = labelFor(cfg.users, user);
 	if (user !== DEBUG_USER_KEY) {
@@ -181,6 +181,22 @@ async function handleApplyTask(env: Env, user: string, taskId: string) {
 			}),
 			"parent",
 		);
+	} else {
+		const debugEndpoint = String(env.DEBUG_ENDPOINT ?? "").trim();
+		if (debugEndpoint) {
+			await notify(
+				env,
+				`[DEBUG] ${fmt(MSG.notifySubjectApply, { user: displayName })}`,
+				buildApplyNotifyBody(displayName, {
+					taskLabel,
+					completeReward,
+					submitReward: isFirstSubmit ? submitReward : 0,
+				}),
+				"parent",
+				undefined,
+				debugEndpoint,
+			);
+		}
 	}
 
 	return { taskId, status: STATUS.SUBMITTED, history };

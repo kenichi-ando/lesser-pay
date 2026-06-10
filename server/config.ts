@@ -24,9 +24,9 @@ export interface Config {
 	users: User[];
 }
 
-// When env.DEBUG is set, this user is appended to the USERS roster and its
-// parent-targeted push notifications are suppressed. Kept English-only on
-// purpose — it's an operator-facing test account, not a child.
+// When env.DEBUG_ENDPOINT is non-empty, this user is appended to the USERS
+// roster. Kept English-only on purpose — it's an operator-facing test account,
+// not a child.
 export const DEBUG_USER_KEY = "Debug";
 const DEBUG_USER_LABEL = "Debug User";
 
@@ -51,18 +51,11 @@ function parseUsers(raw: string): User[] {
 	return parsed;
 }
 
-// "0" / "false" / "no" / "off" / "" → off; anything else → on. Lets you flip
-// the flag with `wrangler secret put DEBUG 0` instead of `secret delete`.
-function isTruthyFlag(value: string | undefined): boolean {
-	if (!value) return false;
-	const v = value.trim().toLowerCase();
-	return v !== "" && v !== "0" && v !== "false" && v !== "no" && v !== "off";
-}
-
 export function fetchConfig(env: Env): Config {
 	const base = parseUsers(env.USERS ?? "");
+	const debugEnabled = String(env.DEBUG_ENDPOINT ?? "").trim().length > 0;
 	const users =
-		isTruthyFlag(env.DEBUG) && !base.some((u) => u.key === DEBUG_USER_KEY)
+		debugEnabled && !base.some((u) => u.key === DEBUG_USER_KEY)
 			? [...base, { key: DEBUG_USER_KEY, label: DEBUG_USER_LABEL }]
 			: base;
 	return {

@@ -80,7 +80,11 @@
         });
       });
       const loginSwitchBtn = els.userPopoverList.querySelector('[data-action="switch-login-user"]');
-      if (loginSwitchBtn) loginSwitchBtn.addEventListener('click', openLoginUserSelection);
+      if (loginSwitchBtn) {
+        loginSwitchBtn.addEventListener('click', function () {
+          void openLoginUserSelection();
+        });
+      }
       const settingsBtn = els.userPopoverList.querySelector('[data-action="open-settings"]');
       if (settingsBtn) settingsBtn.addEventListener('click', function () {
         closeUserPopover();
@@ -101,8 +105,13 @@
       else closeUserPopover();
     }
 
-    function openLoginUserSelection() {
+    async function openLoginUserSelection() {
       closeUserPopover();
+      try {
+        await data.refreshServerConfig();
+      } catch (err) {
+        actions.toast(err && err.message ? err.message : tr('errors.network'), 'error');
+      }
       const canClose = !!state.user;
       showUserSelection({
         closable: canClose,
