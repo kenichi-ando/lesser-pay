@@ -25,17 +25,17 @@ lesser-pay/
 │   ├── sw.js                          # Service Worker (Web Push + バッジ管理)
 │   ├── icons/                         # PWA / favicon アイコン
 │   ├── css/style.css
-│   └── js/
-│       ├── config.js                  # localStorage キー定義のみ (個人情報なし)
-│       ├── strings.js                 # 画面文言 (i18n)
-│       ├── app-i18n.js                # tr/applyI18n
-│       ├── app-store.js               # localStorage ラッパ
-│       ├── app-utils.js               # 日付/表示ユーティリティ
-│       ├── app-render.js              # 描画専用レイヤ
-│       ├── app-controller-data.js     # API通信/boot/loadData
-│       ├── app-controller-actions.js  # タスク操作/キャッシュアウト/toast
-│       ├── app-controller.js          # ユーザー切替/親モードUIの制御
-│       └── app.js                     # 依存注入とイベント配線（オーケストレーター）
+│   └── ts/
+│       ├── config.ts                  # localStorage キー定義のみ (個人情報なし)
+│       ├── strings.ts                 # 画面文言 (i18n)
+│       ├── app-i18n.ts                # tr/applyI18n
+│       ├── app-store.ts               # localStorage ラッパ
+│       ├── app-utils.ts               # 日付/表示ユーティリティ
+│       ├── app-render.ts              # 描画専用レイヤ
+│       ├── app-controller-data.ts     # API通信/boot/loadData
+│       ├── app-controller-actions.ts  # タスク操作/キャッシュアウト/toast
+│       ├── app-controller.ts          # ユーザー切替/親モードUIの制御
+│       └── app.ts                     # 依存注入とイベント配線（オーケストレーター）
 └── wrangler.jsonc         # Worker 設定 (静的アセットバインディング含む)
 ```
 

@@ -3,7 +3,7 @@
  *
  * Everything is set once via `wrangler secret put …`:
  *   - PARENT_PIN: parent-mode PIN (string)
- *   - USERS:      Comma-separated `key:label` pairs, e.g. `Rina:りな, Yurika:ゆりか`.
+ *   - USERS:      Comma-separated `key:label` pairs, e.g. `Light:Light, Tiara:Tiara`.
  *                 `label` is optional (`key` is used when omitted).
  *
  * Family-scale apps don't change the roster often enough for the spreadsheet

@@ -19,8 +19,8 @@ export interface Env {
 	API_TOKEN: string;
 	// Parent-mode PIN (verified on approve / reject / cashout).
 	PARENT_PIN: string;
-	// JSON array of {key,label} for the user roster, e.g.
-	//   '[{"key":"Light","label":"ライト"},{"key":"Tiara","label":"ティアラ"}]'
+	// Comma-separated key:label pairs for the user roster, e.g.
+	//   "Light:Light, Tiara:Tiara"
 	USERS: string;
 	// Optional: VAPID key pair for Web Push (PWA notifications).
 	// Unset → push notifications are skipped.

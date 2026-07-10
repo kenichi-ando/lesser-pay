@@ -5,8 +5,6 @@ node_modules/
 firebase-debug.log
 *.log
 
-# 難読化されたビルド成果物 (ローカル保管のみ)
-*.obfuscated.js
 client/js/*.js
 client/js/*.js.map
 

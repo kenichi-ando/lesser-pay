@@ -57,7 +57,7 @@ export const HISTORY_COL_COUNT = HISTORY_SCHEMA.length;
 export const HISTORY_LAST_COL_LETTER = colLetter(HISTORY_COL_COUNT);
 
 // Emoji-prefixed history content labels used in HISTORY.CONTENT.
-// Older rows that still carry " (提出)" / " (承認)" suffixes render as-is —
+// Older rows that still carry localized status suffixes render as-is —
 // we don't rewrite history. New rows use these prefixes.
 export const HISTORY_LABEL = {
 	SUBMIT_PREFIX: "📩 ",

@@ -59,17 +59,17 @@ lesser-pay/
 │   ├── icons/*            # PNG (favicons/app icons) + optional SVG assets
 │   ├── manifest.webmanifest
 │   ├── sw.js              # Service Worker: push handler + badge counter
-│   └── js/
-│       ├── config.js                  # localStorage keys (no personal data)
-│       ├── strings.js                 # All user-facing UI strings (i18n)
-│       ├── app-i18n.js                # tr() / applyI18n()
-│       ├── app-store.js               # localStorage accessors
-│       ├── app-utils.js               # formatting / escaping helpers
-│       ├── app-render.js              # pure rendering layer
-│       ├── app-controller-data.js     # api(), bootstrap(), loadData()
-│       ├── app-controller-actions.js  # task actions / cashout / toast
-│       ├── app-controller.js          # user selection + parent-mode orchestration
-│       └── app.js                     # wiring + event listeners only
+│   └── ts/
+│       ├── config.ts                  # localStorage keys (no personal data)
+│       ├── strings.ts                 # All user-facing UI strings (i18n)
+│       ├── app-i18n.ts                # tr() / applyI18n()
+│       ├── app-store.ts               # localStorage accessors
+│       ├── app-utils.ts               # formatting / escaping helpers
+│       ├── app-render.ts              # pure rendering layer
+│       ├── app-controller-data.ts     # api(), bootstrap(), loadData()
+│       ├── app-controller-actions.ts  # task actions / cashout / toast
+│       ├── app-controller.ts          # user selection + parent-mode orchestration
+│       └── app.ts                     # wiring + event listeners only
 ├── wrangler.jsonc         # Worker config (incl. ASSETS binding)
 ├── tsconfig.json
 └── package.json
@@ -312,7 +312,7 @@ in PC testing for a while.
 - `notificationclick` focuses an existing client window (or opens `/`),
   clearing the badge as a side effect.
 
-`client/js/app.js` posts `clearBadge` whenever the document becomes visible,
+`client/ts/app.ts` posts `clearBadge` whenever the document becomes visible,
 giving "open the app → badge disappears" UX.
 
 ### `PushSubscriptions` sheet
@@ -335,7 +335,7 @@ mismatch`).
 
 ## i18n
 
-`client/js/strings.js` is the single place for user-facing copy on the
+`client/ts/strings.ts` is the single place for user-facing copy on the
 frontend; `server/messages.ts` (`MSG`) is the equivalent on the server.
 Two channels on the client:
 
@@ -347,11 +347,11 @@ Two channels on the client:
 
 Server-side, `fmt(MSG.someKey, { vars })` does the same `{name}` interpolation.
 
-To support a second language: keep `strings.js` as a default and add e.g.
+To support a second language: keep `strings.ts` as a default and add e.g.
 `strings.en.js`; pick one based on `localStorage` or `navigator.language`.
 
 System-internal identifiers (sheet name prefixes, STATUS values, schema keys)
-are English; user-visible copy lives in `strings.js` / `messages.ts`. The
+are English; user-visible copy lives in `strings.ts` / `messages.ts`. The
 spreadsheet's row 1 (header) is ignored by the Worker, so families can label
 columns in whatever language they prefer without affecting behaviour.
 
@@ -383,22 +383,22 @@ columns in whatever language they prefer without affecting behaviour.
 - `util.ts` — `HttpError`, `constantTimeEqual`, b64url, date helpers,
   `isExpired` (Asia/Tokyo).
 
-### Frontend (`client/js/*.js`)
+### Frontend (`client/ts/*.ts`)
 
 - `app.js` — bootstraps the app, wires dependencies, defines shared `state`,
   and attaches DOM event listeners.
-- `app-i18n.js` — `tr()` and `applyI18n()` implementation.
-- `app-store.js` — browser persistence (`lesserpay_user`, `lesserpay_parent_pin`,
+- `app-i18n.ts` — `tr()` and `applyI18n()` implementation.
+- `app-store.ts` — browser persistence (`lesserpay_user`, `lesserpay_parent_pin`,
   `lesserpay_api_token`).
-- `app-utils.js` — `escapeHtml`, date parsing/formatting, expired checks,
+- `app-utils.ts` — `escapeHtml`, date parsing/formatting, expired checks,
   and minutes formatting.
-- `app-render.js` — pure render layer (`render()`, `renderTabs()`, task/history
+- `app-render.ts` — pure render layer (`render()`, `renderTabs()`, task/history
   templates). No network calls.
-- `app-controller-data.js` — API wrapper (`api()`), boot flow (`bootstrap()`),
+- `app-controller-data.ts` — API wrapper (`api()`), boot flow (`bootstrap()`),
   config refresh, cache-aware `loadData()`, and locked-screen rendering.
-- `app-controller-actions.js` — mutation-side UI actions (`apply/approve/reject`,
+- `app-controller-actions.ts` — mutation-side UI actions (`apply/approve/reject`,
   `cashout`, `grantBonus`) plus `toast()`.
-- `app-controller.js` — orchestration for user selection popover, parent-login
+- `app-controller.ts` — orchestration for user selection popover, parent-login
   modal flow, parent-mode-aware user switching, and coordination across the
   data/actions modules.
 
@@ -424,7 +424,7 @@ columns in whatever language they prefer without affecting behaviour.
 3. **Frontend** — call `await api('newAction', { foo })`. The client's `api()`
    wrapper attaches the `Authorization: Bearer <token>` header automatically.
 4. **Strings** — add new server messages to `server/messages.ts`,
-   client strings to `client/js/strings.js`.
+   client strings to `client/ts/strings.ts`.
 5. **Deploy** (`npm run deploy`).
 
 ## Local development
@@ -532,8 +532,8 @@ because the Service Account itself owns its delegation.
   Web Push and the badge counter — it has no `fetch` handler, so the page
   always loads from the network and "always show the latest deploy" still
   holds.
-- No bundler for the frontend. The Worker serves `client/` as-is. Adding
-  bundling trades simplicity for marginal performance — avoid until needed.
+- No bundler for the frontend. TypeScript is compiled with `tsc` into
+  `client/js`, and the Worker serves `client/` as-is.
 - No automated tests. The behaviour surface is small enough to verify manually
   per change. `npx tsc --noEmit` is the only static check; `wrangler deploy`
   also runs a build that surfaces the same errors.
@@ -546,8 +546,8 @@ When reviewing a PR, the things most likely to be wrong:
    (`TASK_COL_COUNT` should propagate; double-check any range string like
    `${tasksSheet}!A2:${TASK_LAST_COL_LETTER}` and the `shapeTasks` mapper).
 2. A new state was added but only some of the comparison sites were updated.
-   Search for `STATUS.` in both `server/` and `client/js/`.
-3. A new UI string was added but only added to `strings.js`, not actually
+   Search for `STATUS.` in both `server/` and `client/ts/`.
+3. A new UI string was added but only added to `strings.ts`, not actually
    referenced via `tr(...)` (or vice versa). Server-side, the equivalent slip
    is referencing a `MSG.x` key that doesn't exist.
 4. A new action was added but `requireUser` was set wrong (most actions need
