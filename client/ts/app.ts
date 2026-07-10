@@ -1,14 +1,14 @@
 (function () {
   'use strict';
 
-  const CONFIG = window.LESSERPAY_CONFIG;
+  const CONFIG = (window as any).LESSERPAY_CONFIG;
   const SK = CONFIG.STORAGE_KEYS;
-  const STRINGS = window.LESSERPAY_STRINGS || {};
-  const i18n = window.LESSERPAY_I18N.create(STRINGS);
+  const STRINGS = (window as any).LESSERPAY_STRINGS || {};
+  const i18n = (window as any).LESSERPAY_I18N.create(STRINGS);
   const tr = i18n.tr;
   const applyI18n = i18n.applyI18n;
-  const store = window.LESSERPAY_STORE.create(SK);
-  const utils = window.LESSERPAY_UTILS.create({ tr: tr });
+  const store = (window as any).LESSERPAY_STORE.create(SK);
+  const utils = (window as any).LESSERPAY_UTILS.create({ tr: tr });
   const escapeHtml = utils.escapeHtml;
   const formatDate = utils.formatDate;
   const isExpired = utils.isExpired;
@@ -33,7 +33,7 @@
     activeTab: 'tasks'
   };
 
-  const $ = function (id) { return document.getElementById(id); };
+  const $ = function (id: string) { return document.getElementById(id); };
   const els = {
     userLabel: $('user-label'),
     userPopover: $('user-popover'),
@@ -83,7 +83,7 @@
     renderTabs: function () {}
   };
 
-  const controller = window.LESSERPAY_CONTROLLER.create({
+  const controller = (window as any).LESSERPAY_CONTROLLER.create({
     CONFIG: CONFIG,
     store: store,
     state: state,
@@ -97,7 +97,7 @@
     openSettings: function () { openSettingsModal(); }
   });
 
-  const renderer = window.LESSERPAY_RENDER.create({
+  const renderer = (window as any).LESSERPAY_RENDER.create({
     state: state,
     els: els,
     tr: tr,
@@ -112,7 +112,7 @@
   runtime.render = renderer.render;
   runtime.renderTabs = renderer.renderTabs;
 
-  function switchTab(tab) {
+  function switchTab(tab: string) {
     if (tab !== 'tasks' && tab !== 'history') return;
     if (state.activeTab === tab) return;
     state.activeTab = tab;
@@ -144,7 +144,7 @@
     });
     document.addEventListener('click', function (e) {
       if (els.userPopover.classList.contains('hidden')) return;
-      if (!els.userPopover.contains(e.target) && e.target !== els.userLabel) {
+      if (!els.userPopover.contains(e.target as Node) && e.target !== els.userLabel) {
         controller.closeUserPopover();
       }
     });
@@ -182,16 +182,16 @@
     setToggle(els.settingsPushToggle, pushOn);
     if (els.settingsPushRow) {
       const supported = !!controller.isPushSupported();
-      els.settingsPushRow.disabled = !supported;
+      (els.settingsPushRow as HTMLButtonElement).disabled = !supported;
       els.settingsPushRow.style.opacity = supported ? '' : '0.55';
       els.settingsPushRow.style.pointerEvents = supported ? '' : 'none';
     }
-    const sound = window.LESSERPAY_SOUND;
+    const sound = window.LESSERPAY_SOUND as any;
     const soundOn = sound ? !sound.isMuted() : true;
     setToggle(els.settingsSoundToggle, soundOn);
   }
 
-  function setToggle(node, isOn) {
+  function setToggle(node: HTMLElement | null, isOn: boolean) {
     if (!node) return;
     node.classList.toggle('is-on', !!isOn);
     node.setAttribute('aria-checked', isOn ? 'true' : 'false');
@@ -208,7 +208,7 @@
   }
 
   function onToggleSound() {
-    const sound = window.LESSERPAY_SOUND;
+    const sound = window.LESSERPAY_SOUND as any;
     if (!sound) return;
     const muted = sound.toggleMuted();
     if (!muted) sound.play('toggle');
@@ -307,7 +307,7 @@
   }
 
   function setupSoundUnlock() {
-    const sound = window.LESSERPAY_SOUND;
+    const sound = window.LESSERPAY_SOUND as any;
     if (!sound) return;
     function unlock() {
       sound.unlock();

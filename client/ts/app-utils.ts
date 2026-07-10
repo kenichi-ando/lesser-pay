@@ -1,39 +1,62 @@
 (function () {
   'use strict';
 
-  function create(options) {
+  type Translator = (key: string, vars?: Record<string, string | number>) => string;
+  type BusyElement = HTMLElement & { disabled: boolean };
+  type BusyNode = BusyElement | null | undefined;
+  type BusyTargets = BusyNode | BusyNode[];
+
+  interface BusyOptions {
+    label?: string;
+    labelNode?: HTMLElement | null;
+  }
+
+  interface UtilsApi {
+    escapeHtml: (value: unknown) => string;
+    parseDate: (source: unknown) => Date | null;
+    formatDate: (source: unknown) => string;
+    isExpired: (source: unknown) => boolean;
+    formatMinutes: (mins: unknown) => string;
+    withBusy: <T>(targets: BusyTargets, options: BusyOptions | undefined, task: () => Promise<T>) => Promise<T>;
+  }
+
+  function create(options: { tr: Translator }): UtilsApi {
     const tr = options.tr;
 
-    function escapeHtml(value) {
-      return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
-        return ({
+    function escapeHtml(value: unknown): string {
+      return String(value ?? '').replace(/[&<>"']/g, function (ch) {
+        const escaped: Record<string, string> = {
           '&': '&amp;',
           '<': '&lt;',
           '>': '&gt;',
           '"': '&quot;',
           "'": '&#39;'
-        })[ch];
+        };
+        return escaped[ch] || ch;
       });
     }
 
-    function parseDate(source) {
+    function parseDate(source: unknown): Date | null {
       if (!source) return null;
       let date = new Date(String(source).replace(/-/g, '/'));
       if (!Number.isNaN(date.getTime())) return date;
-      date = new Date(source);
-      return Number.isNaN(date.getTime()) ? null : date;
+      if (source instanceof Date || typeof source === 'number' || typeof source === 'string') {
+        date = new Date(source);
+        return Number.isNaN(date.getTime()) ? null : date;
+      }
+      return null;
     }
 
-    function formatDate(source) {
+    function formatDate(source: unknown): string {
       const date = parseDate(source);
-      if (!date) return String(source == null ? '' : source);
+      if (!date) return String(source ?? '');
       const y = date.getFullYear();
       const m = String(date.getMonth() + 1).padStart(2, '0');
       const d = String(date.getDate()).padStart(2, '0');
       return y + '/' + m + '/' + d;
     }
 
-    function isExpired(source) {
+    function isExpired(source: unknown): boolean {
       const date = parseDate(source);
       if (!date) return false;
       date.setHours(0, 0, 0, 0);
@@ -42,7 +65,7 @@
       return date < today;
     }
 
-    function formatMinutes(mins) {
+    function formatMinutes(mins: unknown): string {
       const m = Number(mins) || 0;
       if (m <= 0) return '';
       const h = Math.floor(m / 60);
@@ -52,13 +75,15 @@
       return tr('time.minute', { m: r });
     }
 
-    async function withBusy(targets, options, task) {
-      const opts = options || {};
-      const nodes = (Array.isArray(targets) ? targets : [targets]).filter(Boolean);
+    async function withBusy<T>(targets: BusyTargets, options: BusyOptions = {}, task: () => Promise<T>): Promise<T> {
+      const opts = options;
+      const nodes = (Array.isArray(targets) ? targets : [targets]).filter(
+        (node): node is BusyElement => Boolean(node)
+      );
       const states = nodes.map(function (node) {
         return {
           node: node,
-          disabled: !!node.disabled,
+          disabled: node.disabled,
           ariaBusy: node.getAttribute('aria-busy')
         };
       });
@@ -71,7 +96,7 @@
         state.node.classList.add('is-loading');
         state.node.setAttribute('aria-busy', 'true');
       });
-      if (hasLabel && labelNode) labelNode.textContent = opts.label;
+      if (hasLabel && labelNode) labelNode.textContent = opts.label || '';
 
       try {
         return await task();
@@ -96,5 +121,5 @@
     };
   }
 
-  window.LESSERPAY_UTILS = { create: create };
+  (window as any).LESSERPAY_UTILS = { create: create };
 })();

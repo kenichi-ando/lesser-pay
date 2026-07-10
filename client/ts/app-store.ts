@@ -1,7 +1,36 @@
 (function () {
   'use strict';
 
-  function create(storageKeys) {
+  interface StorageKeys {
+    user: string;
+    parentPin: string;
+    parentMode: string;
+    apiToken: string;
+    pushPromptDismissed: string;
+    submittedSnapshot: string;
+  }
+
+  interface StoreApi {
+    getUser: () => string | null;
+    setUser: (user: string) => void;
+    clearUser: () => void;
+    getParentPin: () => string | null;
+    setParentPin: (pin: string) => void;
+    clearParentPin: () => void;
+    getParentMode: () => boolean;
+    setParentMode: (enabled: boolean) => void;
+    clearParentMode: () => void;
+    getApiToken: () => string | null;
+    setApiToken: (token: string) => void;
+    clearApiToken: () => void;
+    getPushPromptDismissed: () => boolean;
+    setPushPromptDismissed: () => void;
+    clearPushPromptDismissed: () => void;
+    getSubmittedSnapshot: (user: string) => string[];
+    setSubmittedSnapshot: (user: string, ids: string[]) => void;
+  }
+
+  function create(storageKeys: StorageKeys): StoreApi {
     const sk = storageKeys;
     return {
       getUser: function () { return localStorage.getItem(sk.user); },
@@ -23,7 +52,9 @@
       setPushPromptDismissed: function () { localStorage.setItem(sk.pushPromptDismissed, '1'); },
       clearPushPromptDismissed: function () { localStorage.removeItem(sk.pushPromptDismissed); },
       getSubmittedSnapshot: function (user) {
-        return JSON.parse(localStorage.getItem(sk.submittedSnapshot + '_' + user) || '[]');
+        const raw = localStorage.getItem(sk.submittedSnapshot + '_' + user);
+        const parsed: unknown = JSON.parse(raw || '[]');
+        return Array.isArray(parsed) ? parsed.map(String) : [];
       },
       setSubmittedSnapshot: function (user, ids) {
         localStorage.setItem(sk.submittedSnapshot + '_' + user, JSON.stringify(ids));
@@ -31,5 +62,5 @@
     };
   }
 
-  window.LESSERPAY_STORE = { create: create };
+  (window as any).LESSERPAY_STORE = { create: create };
 })();

@@ -4,7 +4,7 @@
 //
 // iOS Safari requires the FIRST AudioContext.resume() to happen synchronously
 // inside a user gesture handler; we do that in unlock().
-window.LESSERPAY_SOUND = (function () {
+(window as any).LESSERPAY_SOUND = (function () {
   const STORAGE_KEY = 'lesserpay_muted';
 
   let ctx = null;
@@ -20,7 +20,7 @@ window.LESSERPAY_SOUND = (function () {
     }
   }
 
-  function writeMuted(value) {
+  function writeMuted(value: boolean) {
     try {
       localStorage.setItem(STORAGE_KEY, value ? '1' : '0');
     } catch (_) { /* ignore */ }
@@ -28,7 +28,7 @@ window.LESSERPAY_SOUND = (function () {
 
   function ensureCtx() {
     if (ctx) return ctx;
-    const Ctor = window.AudioContext || window.webkitAudioContext;
+    const Ctor = window.AudioContext || (window as any).webkitAudioContext;
     if (!Ctor) return null;
     ctx = new Ctor();
     masterGain = ctx.createGain();
@@ -58,7 +58,7 @@ window.LESSERPAY_SOUND = (function () {
 
   function isMuted() { return muted; }
 
-  function setMuted(value) {
+  function setMuted(value: boolean) {
     muted = !!value;
     writeMuted(muted);
   }
@@ -69,7 +69,7 @@ window.LESSERPAY_SOUND = (function () {
   }
 
   // Single oscillator beep with an exponential gain envelope.
-  function beep(opts) {
+  function beep(opts: any) {
     if (muted) return;
     const c = ensureCtx();
     if (!c || c.state === 'suspended') return;
@@ -94,7 +94,7 @@ window.LESSERPAY_SOUND = (function () {
   }
 
   // Built-in palette. Each entry is one or more layered beeps.
-  function play(name) {
+  function play(name: string) {
     if (muted) return;
     const c = ensureCtx();
     if (!c) return;

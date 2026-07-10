@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  function create(deps) {
+  function create(deps: any) {
     const CONFIG = deps.CONFIG;
     const store = deps.store;
     const state = deps.state;
@@ -13,7 +13,7 @@
 
     let dataCache = null;
 
-    function isValidInviteCode(value) {
+    function isValidInviteCode(value: string) {
       const code = (value || '').trim().toUpperCase();
       return CONFIG.INVITE_CODE_PATTERN.test(code);
     }
@@ -27,7 +27,7 @@
 
     function isStandalone() {
       if (typeof window === 'undefined') return false;
-      if (window.navigator && window.navigator.standalone === true) return true;
+      if (window.navigator && (window.navigator as any).standalone === true) return true;
       if (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches) return true;
       return false;
     }
@@ -53,7 +53,7 @@
       return (typeof Notification !== 'undefined' && Notification.permission) ? Notification.permission : 'unsupported';
     }
 
-    function base64UrlToUint8Array(base64Url) {
+    function base64UrlToUint8Array(base64Url: string) {
       const padding = '='.repeat((4 - base64Url.length % 4) % 4);
       const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
       const raw = atob(base64);
@@ -62,7 +62,7 @@
       return out;
     }
 
-    function bufferToBase64Url(buf) {
+    function bufferToBase64Url(buf: ArrayBuffer) {
       const bytes = new Uint8Array(buf);
       let bin = '';
       for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
@@ -95,7 +95,7 @@
       return created;
     }
 
-    async function syncPushSubscription(reg) {
+    async function syncPushSubscription(reg: ServiceWorkerRegistration) {
       const current = await reg.pushManager.getSubscription();
       if (!current) return false;
       const p256dh = current.getKey('p256dh');
@@ -125,7 +125,7 @@
       }
     }
 
-    function setPushSubscribedState(isEnabled) {
+    function setPushSubscribedState(isEnabled: boolean) {
       pushSubscribed = !!isEnabled;
     }
 
@@ -197,7 +197,7 @@
       return !!pushSubscribed;
     }
 
-    async function api(action, payload) {
+    async function api(action: string, payload?: any) {
       const token = store.getApiToken();
       if (!token) throw new UnauthorizedError();
       const body = Object.assign({ action: action }, payload || {});
@@ -240,7 +240,7 @@
     // "tasks that were Submitted at the last load", persisted in localStorage
     // so it survives app close/reopen — which is the whole reason we need
     // this: the parent typically approves while the kid isn't looking.
-    function detectNewlyApproved(nextTasks) {
+    function detectNewlyApproved(nextTasks: any[]) {
       if (state.parentMode || !state.user) return [];
       const status = (deps.getStatus && deps.getStatus()) || {};
       const prevSubmitted = new Set(store.getSubmittedSnapshot(state.user));
@@ -251,7 +251,7 @@
       return ids;
     }
 
-    function persistSubmittedSnapshot(tasks) {
+    function persistSubmittedSnapshot(tasks: any[]) {
       if (!state.user) return;
       // The snapshot is the kid's view of "what's still awaiting approval."
       // Parent-mode loads run against the kid's same state.user, so writing
@@ -377,14 +377,14 @@
       const modal = document.getElementById('invite-modal');
       modal.querySelector('.modal-title').textContent = tr('locked.openInput');
       modal.querySelector('.modal-desc').textContent = tr('locked.inputLabel', { n: CONFIG.INVITE_CODE_LENGTH });
-      modal.querySelector('#invite-token-input').placeholder = tr('locked.inputPlaceholder');
+      (modal.querySelector('#invite-token-input') as HTMLInputElement).placeholder = tr('locked.inputPlaceholder');
       modal.querySelector('#invite-cancel-btn').textContent = tr('locked.cancel');
       modal.querySelector('#invite-submit-btn').textContent = tr('locked.submit');
 
-      const input = modal.querySelector('#invite-token-input');
-      const submit = modal.querySelector('#invite-submit-btn');
-      const cancel = modal.querySelector('#invite-cancel-btn');
-      const error = modal.querySelector('#invite-error');
+      const input = modal.querySelector('#invite-token-input') as HTMLInputElement;
+      const submit = modal.querySelector('#invite-submit-btn') as HTMLButtonElement;
+      const cancel = modal.querySelector('#invite-cancel-btn') as HTMLButtonElement;
+      const error = modal.querySelector('#invite-error') as HTMLElement;
       const submitBtn = submit;
       const redeemInvite = async function () {
         const code = (input.value || '').trim().toUpperCase();
@@ -422,17 +422,17 @@
           error.classList.remove('hidden');
         }
       };
-      panel.querySelector('#locked-token-open').onclick = function () {
+      (panel.querySelector('#locked-token-open') as HTMLButtonElement).onclick = function () {
         error.classList.add('hidden');
         modal.classList.remove('hidden');
         setTimeout(function () { input.focus(); }, 50);
       };
       submit.onclick = redeemInvite;
       cancel.onclick = function () { modal.classList.add('hidden'); };
-      modal.onclick = function (e) {
+      modal.onclick = function (e: MouseEvent) {
         if (e.target === modal) modal.classList.add('hidden');
       };
-      input.onkeydown = function (e) {
+      input.onkeydown = function (e: KeyboardEvent) {
         if (e.key !== 'Enter') return;
         e.preventDefault();
         redeemInvite();
@@ -441,7 +441,7 @@
       panel.classList.remove('hidden');
     }
 
-    async function loadData(force) {
+    async function loadData(force: boolean) {
       const forced = !!force;
       if (!state.booted || !state.user) return;
       const now = Date.now();
@@ -535,5 +535,5 @@
     };
   }
 
-  window.LESSERPAY_CONTROLLER_DATA = { create: create };
+  (window as any).LESSERPAY_CONTROLLER_DATA = { create: create };
 })();

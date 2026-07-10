@@ -5,31 +5,24 @@
 //
 // HTML elements use `data-i18n="key"` (replaces textContent) or
 // `data-i18n-attr-<attr>="key"` (replaces an attribute, e.g. placeholder/aria-label).
-window.LESSERPAY_STRINGS = {
+const STRINGS = {
   app: {
     title: 'LesserPay',
     docTitleParent: 'LesserPay (保護者)',
     docTitleKid: 'LesserPay - {name}'
   },
-
   header: {
     currentUser: '現在のユーザー',
     currentKid: '{name}',
     currentParent: '保護者（{name}）'
   },
-
   userSelect: {
     title: '誰が使う？',
     desc: '使う人を選んでね',
     parent: '保護者',
     close: '選択画面を閉じる'
   },
-
-  balance: {
-    label: '現在のレッサーポイント',
-    unit: 'pt'
-  },
-
+  balance: { label: '現在のレッサーポイント', unit: 'pt' },
   tasks: {
     sectionTitle: 'がんばること',
     otherGroup: 'その他',
@@ -57,22 +50,8 @@ window.LESSERPAY_STRINGS = {
     rewardCompleteOnly: '完了 {complete} pt',
     rewardBoth: '提出 {submit} pt & 完了 {complete} pt'
   },
-
-  history: {
-    sectionTitle: 'あしあと',
-    empty: '履歴がまだありません',
-    loading: '読み込み中…'
-  },
-
-  parent: {
-    title: '保護者ログイン',
-    desc: '暗証番号を入力してください',
-    cancel: 'キャンセル',
-    login: 'ログイン',
-    checking: '確認中…',
-    needPin: '暗証番号を入力してください'
-  },
-
+  history: { sectionTitle: 'あしあと', empty: '履歴がまだありません', loading: '読み込み中…' },
+  parent: { title: '保護者ログイン', desc: '暗証番号を入力してください', cancel: 'キャンセル', login: 'ログイン', checking: '確認中…', needPin: '暗証番号を入力してください' },
   cashout: {
     button: '💸 ポイント消費',
     title: 'ポイント消費',
@@ -86,7 +65,6 @@ window.LESSERPAY_STRINGS = {
     toast: '💸 {amount} pt を使いました',
     balance: '現在: {total} pt'
   },
-
   bonus: {
     button: '🎁 ボーナス付与',
     title: 'ボーナス付与',
@@ -101,11 +79,7 @@ window.LESSERPAY_STRINGS = {
     confirm: '「{label}」に {amount} pt を付与します。よろしいですか?',
     toast: '🎁 {amount} pt を付与しました'
   },
-
-  setup: {
-    needUsers: 'USERS シークレット (wrangler secret put USERS) を設定してください'
-  },
-
+  setup: { needUsers: 'USERS シークレット (wrangler secret put USERS) を設定してください' },
   locked: {
     title: '🔒 アクセスできません',
     desc: '家族から教わった招待コードを入力してください。',
@@ -119,7 +93,6 @@ window.LESSERPAY_STRINGS = {
     invalidLength: '招待コードは {n} 文字 (大文字または数字) で入力してください',
     invalidCode: '招待コードが正しくありません'
   },
-
   users: {
     switcherTitle: 'ユーザー切り替え',
     childSwitchTitle: '表示する子供',
@@ -128,32 +101,10 @@ window.LESSERPAY_STRINGS = {
     switchedLoginToast: '{name} でログインしました',
     switchedParentToast: '保護者でログインしました'
   },
-
-  settings: {
-    open: '設定を開く',
-    title: '⚙️ 設定',
-    desc: 'お知らせと音を切り替えできます',
-    notifications: 'お知らせ',
-    sound: '効果音',
-    close: '閉じる'
-  },
-
-  push: {
-    unsupported: 'この端末では通知に未対応です',
-    denied: '通知がブロックされています。ブラウザ設定で許可してください',
-    enabledToast: '通知を有効化しました',
-    disabledToast: '通知を無効化しました',
-    failed: '通知の設定に失敗しました'
-  },
-
-  time: {
-    hourAndMinute: '{h}時間{m}分',
-    hour:          '{h}時間',
-    minute:        '{m}分'
-  },
-
-  errors: {
-    network: '通信エラー',
-    unknown: '不明なエラー'
-  }
+  settings: { open: '設定を開く', title: '⚙️ 設定', desc: 'お知らせと音を切り替えできます', notifications: 'お知らせ', sound: '効果音', close: '閉じる' },
+  push: { unsupported: 'この端末では通知に未対応です', denied: '通知がブロックされています。ブラウザ設定で許可してください', enabledToast: '通知を有効化しました', disabledToast: '通知を無効化しました', failed: '通知の設定に失敗しました' },
+  time: { hourAndMinute: '{h}時間{m}分', hour: '{h}時間', minute: '{m}分' },
+  errors: { network: '通信エラー', unknown: '不明なエラー' }
 };
+
+(window as any).LESSERPAY_STRINGS = STRINGS;

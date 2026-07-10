@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  function create(deps) {
+  function create(deps: any) {
     const state = deps.state;
     const els = deps.els;
     const tr = deps.tr;
@@ -12,7 +12,11 @@
     const isExpired = deps.isExpired;
     const onTaskAction = deps.onTaskAction;
 
-    function formatRewards(task) {
+    function sumHistoryPoints(history: any[]): number {
+      return history.reduce(function (sum, h) { return sum + (Number(h.points) || 0); }, 0);
+    }
+
+    function formatRewards(task: any) {
       const sub = Number(task.submitReward) || 0;
       const com = Number(task.completeReward) || Number(task.points) || 0;
       const showSub = sub > 0;
@@ -35,7 +39,7 @@
       return '';
     }
 
-    function taskItemHtml(task) {
+    function taskItemHtml(task: any) {
       const status = getStatus();
       const statusClass =
         task.status === status.SUBMITTED ? 'status-applied' :
@@ -99,7 +103,7 @@
     }
 
     function renderBalance() {
-      const total = state.history.reduce(function (sum, h) { return sum + (Number(h.points) || 0); }, 0);
+      const total = sumHistoryPoints(state.history);
       els.balance.textContent = total.toLocaleString();
     }
 
@@ -172,7 +176,7 @@
     }
 
     function render() {
-      const total = state.history.reduce(function (sum, h) { return sum + (Number(h.points) || 0); }, 0);
+      const total = sumHistoryPoints(state.history);
       // Hide both action buttons until the first data load completes — otherwise
       // the bonus button (no balance gate) renders immediately while cashout
       // (gated on total > 0) only appears after the network round-trip.
@@ -208,5 +212,5 @@
     };
   }
 
-  window.LESSERPAY_RENDER = { create: create };
+  (window as any).LESSERPAY_RENDER = { create: create };
 })();

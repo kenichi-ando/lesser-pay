@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  function create(deps) {
+  function create(deps: any) {
     const store = deps.store;
     const state = deps.state;
     const els = deps.els;
@@ -14,7 +14,7 @@
       return state.serverUsers.map(function (u) { return u.key; });
     }
 
-    function labelOf(key) {
+    function labelOf(key: string) {
       const found = state.serverUsers.find(function (u) { return u.key === key; });
       return found ? found.label : key;
     }
@@ -124,7 +124,7 @@
       });
     }
 
-    function showUserSelection(options) {
+    function showUserSelection(options: any) {
       const opts = options || {};
       state.needsUserSelection = true;
       state.userSelectionClosable = !!opts.closable;
@@ -174,7 +174,7 @@
       hideUserSelection();
     }
 
-    async function onUserSelect(selection) {
+    async function onUserSelect(selection: string) {
       const shouldToast = state.userSelectionClosable;
       if (selection === '__parent__') {
         state.pendingParentSwitchToast = shouldToast;
@@ -200,7 +200,7 @@
       hideUserSelection();
     }
 
-    async function switchUser(key, options) {
+    async function switchUser(key: string, options: any) {
       const opts = options || {};
       const forceExitParentMode = !!opts.forceExitParentMode;
       const sameUser = key === state.user;
@@ -236,7 +236,7 @@
       setTimeout(function () { els.parentPin.focus(); }, 50);
     }
 
-    async function runSubmitWithBusy(button, processingLabel, submitTask, onError) {
+    async function runSubmitWithBusy(button: any, processingLabel: string, submitTask: () => Promise<void>, onError: any) {
       try {
         await withBusy(button, { label: processingLabel }, submitTask);
       } catch (err) {
@@ -302,7 +302,7 @@
       els.parentModal.classList.add('hidden');
     }
 
-    const data = window.LESSERPAY_CONTROLLER_DATA.create({
+    const data = (window as any).LESSERPAY_CONTROLLER_DATA.create({
       CONFIG: deps.CONFIG,
       store: store,
       state: state,
@@ -320,7 +320,7 @@
       withBusy: withBusy
     });
 
-    const actions = window.LESSERPAY_CONTROLLER_ACTIONS.create({
+    const actions = (window as any).LESSERPAY_CONTROLLER_ACTIONS.create({
       state: state,
       els: els,
       tr: tr,
@@ -352,5 +352,5 @@
     };
   }
 
-  window.LESSERPAY_CONTROLLER = { create: create };
+  (window as any).LESSERPAY_CONTROLLER = { create: create };
 })();

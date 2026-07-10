@@ -1,4 +1,25 @@
 // LesserPay configuration (no personal data here).
+interface StorageKeys {
+  user: string;
+  parentPin: string;
+  parentMode: string;
+  apiToken: string;
+  pushPromptDismissed: string;
+  submittedSnapshot: string;
+}
+
+interface LesserPayConfig {
+  STORAGE_KEYS: StorageKeys;
+  INVITE_CODE_LENGTH: number;
+  INVITE_CODE_PATTERN: RegExp;
+  API_URL: string;
+  CACHE_TTL_SEC: number;
+}
+
+interface Window {
+  LESSERPAY_CONFIG: LesserPayConfig;
+}
+
 window.LESSERPAY_CONFIG = {
   STORAGE_KEYS: {
     user:        'lesserpay_user',         // Currently selected sheet-name suffix (key into the CHILDREN list)
