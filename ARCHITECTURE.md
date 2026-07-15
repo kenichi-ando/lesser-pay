@@ -385,7 +385,7 @@ columns in whatever language they prefer without affecting behaviour.
 
 ### Frontend (`client/ts/*.ts`)
 
-- `app.js` — bootstraps the app, wires dependencies, defines shared `state`,
+- `app.ts` — bootstraps the app, wires dependencies, defines shared `state`,
   and attaches DOM event listeners.
 - `app-i18n.ts` — `tr()` and `applyI18n()` implementation.
 - `app-store.ts` — browser persistence (`lesserpay_user`, `lesserpay_parent_pin`,
@@ -535,8 +535,8 @@ because the Service Account itself owns its delegation.
 - No bundler for the frontend. TypeScript is compiled with `tsc` into
   `client/js`, and the Worker serves `client/` as-is.
 - No automated tests. The behaviour surface is small enough to verify manually
-  per change. `npx tsc --noEmit` is the only static check; `wrangler deploy`
-  also runs a build that surfaces the same errors.
+  per change. `npm run typecheck` is the static check (client + server);
+  `wrangler deploy` also runs a build that surfaces compile errors.
 
 ## Reviewer notes
 

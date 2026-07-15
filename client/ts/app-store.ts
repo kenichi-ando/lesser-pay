@@ -1,36 +1,7 @@
 (function () {
   'use strict';
 
-  interface StorageKeys {
-    user: string;
-    parentPin: string;
-    parentMode: string;
-    apiToken: string;
-    pushPromptDismissed: string;
-    submittedSnapshot: string;
-  }
-
-  interface StoreApi {
-    getUser: () => string | null;
-    setUser: (user: string) => void;
-    clearUser: () => void;
-    getParentPin: () => string | null;
-    setParentPin: (pin: string) => void;
-    clearParentPin: () => void;
-    getParentMode: () => boolean;
-    setParentMode: (enabled: boolean) => void;
-    clearParentMode: () => void;
-    getApiToken: () => string | null;
-    setApiToken: (token: string) => void;
-    clearApiToken: () => void;
-    getPushPromptDismissed: () => boolean;
-    setPushPromptDismissed: () => void;
-    clearPushPromptDismissed: () => void;
-    getSubmittedSnapshot: (user: string) => string[];
-    setSubmittedSnapshot: (user: string, ids: string[]) => void;
-  }
-
-  function create(storageKeys: StorageKeys): StoreApi {
+  function create(storageKeys: LPStorageKeys): LPStoreApi {
     const sk = storageKeys;
     return {
       getUser: function () { return localStorage.getItem(sk.user); },
@@ -62,5 +33,5 @@
     };
   }
 
-  (window as any).LESSERPAY_STORE = { create: create };
+  window.LESSERPAY_STORE = { create: create };
 })();

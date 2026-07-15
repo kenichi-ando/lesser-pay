@@ -21,11 +21,29 @@ export function nonEmpty(v: unknown): boolean {
 	return v != null && v !== "";
 }
 
+function consumeUtilError(_error: unknown): void {
+	if (_error === undefined) return;
+}
+
+function toDisplayString(v: unknown): string {
+	if (v == null) return "";
+	if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
+	if (typeof v === "bigint" || typeof v === "symbol") return String(v);
+	if (v instanceof Date) return String(v);
+	try {
+		const json = JSON.stringify(v);
+		return json ?? "";
+	} catch (err) {
+		consumeUtilError(err);
+		return "";
+	}
+}
+
 // Constant-time string compare to avoid leaking length-based timing.
 export function constantTimeEqual(a: string, b: string): boolean {
 	if (a.length !== b.length) return false;
 	let diff = 0;
-	for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+	for (let i = 0; i < a.length; i++) diff |= (a.codePointAt(i) ?? 0) ^ (b.codePointAt(i) ?? 0);
 	return diff === 0;
 }
 
@@ -39,7 +57,7 @@ export function toNumber(v: unknown): number {
 // dateTimeRenderOption=FORMATTED_STRING when reading.
 export function toDateString(v: unknown): string {
 	if (v == null || v === "") return "";
-	return String(v);
+	return toDisplayString(v);
 }
 
 export function toDateTimeString(v: unknown): string {
@@ -53,7 +71,7 @@ export function toDateTimeString(v: unknown): string {
 		const ms = epoch + v * 86400 * 1000;
 		return formatDateTime(new Date(ms));
 	}
-	return String(v);
+	return toDisplayString(v);
 }
 
 // Today (Asia/Tokyo) at 00:00 in epoch ms. Used to compare against EXPIRY.
@@ -68,7 +86,7 @@ export function todayTokyoStart(): number {
 
 export function isExpired(v: unknown): boolean {
 	if (v == null || v === "") return false;
-	const parsed = new Date(String(v));
+	const parsed = new Date(toDisplayString(v));
 	if (Number.isNaN(parsed.getTime())) return false;
 	return parsed.getTime() < todayTokyoStart();
 }
@@ -86,7 +104,9 @@ export function formatDateTime(d: Date): string {
 
 export function generateTaskId(): string {
 	const ts = Date.now().toString();
-	const rand = Math.random().toString(36).slice(2, 6);
+	const randomBytes = crypto.getRandomValues(new Uint8Array(3));
+	const randomValue = (randomBytes[0] << 16) | (randomBytes[1] << 8) | randomBytes[2];
+	const rand = randomValue.toString(36).padStart(4, "0").slice(0, 4);
 	return `T${ts}_${rand}`;
 }
 
@@ -96,6 +116,6 @@ export function b64url(s: string): string {
 
 export function b64urlBytes(bytes: Uint8Array): string {
 	let bin = "";
-	for (const b of bytes) bin += String.fromCharCode(b);
-	return btoa(bin).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+	for (const b of bytes) bin += String.fromCodePoint(b);
+	return btoa(bin).replaceAll("=", "").replaceAll("+", "-").replaceAll("/", "_");
 }

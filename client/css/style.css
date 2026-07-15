@@ -297,7 +297,7 @@ body {
 
 .user-popover-name {
   flex: 1;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .user-popover-group-title {
@@ -646,7 +646,7 @@ body {
   font-size: 15px;
   font-weight: 700;
   margin-bottom: 4px;
-  word-break: break-word;
+  overflow-wrap: anywhere;
   color: var(--color-text);
 }
 
@@ -714,7 +714,7 @@ body {
 
 .task-btn:disabled {
   background: #cfc2b4;
-  color: #fff;
+  color: #3a2418;
   cursor: not-allowed;
   box-shadow: none;
 }
@@ -893,7 +893,7 @@ body {
   font-size: 14px;
   font-weight: 700;
   margin-bottom: 2px;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .history-date {
@@ -977,7 +977,7 @@ body {
    * when parent mode is on. The kid-mode card is unchanged. */
   display: inline-block;
   background: linear-gradient(135deg, #ffd96b 0%, #e8a23a 100%);
-  color: white;
+  color: var(--color-dark);
   border: none;
   padding: 8px 16px;
   border-radius: 12px;
@@ -992,6 +992,13 @@ body {
 
 .balance-bonus {
   background: linear-gradient(135deg, #f7a4c9 0%, #d56ea1 100%);
+  color: #fffaf0;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+.balance-cashout {
+  color: #fffaf0;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
 .balance-cashout:active,
@@ -1211,6 +1218,17 @@ body {
 
 /* ---------------- Utilities ---------------- */
 .hidden { display: none !important; }
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
 
 /* ---------------- Settings rows ---------------- */
 .settings-list {
@@ -1485,7 +1503,7 @@ button:not(:disabled):active,
 }
 
 /* Pop on entry */
-.task-item {
+.tasks-list .task-item {
   animation: task-fade-in 0.4s cubic-bezier(.22, 1.4, .42, 1) backwards;
 }
 
@@ -1515,7 +1533,7 @@ button:not(:disabled):active,
 }
 
 /* Toast entry - bouncier */
-.toast {
+body .toast {
   animation: toast-pop 0.45s cubic-bezier(.22, 1.6, .36, 1);
 }
 
@@ -1526,7 +1544,7 @@ button:not(:disabled):active,
 }
 
 /* User-popover entry — bigger drop with bounce */
-.user-popover {
+.app-header .user-popover {
   animation: popover-drop 0.35s cubic-bezier(.22, 1.6, .36, 1);
   transform-origin: top right;
 }
@@ -1538,7 +1556,7 @@ button:not(:disabled):active,
 }
 
 /* Big task button press */
-.task-btn:active {
+.task-action .task-btn:active {
   animation: btn-squish 0.3s ease;
 }
 

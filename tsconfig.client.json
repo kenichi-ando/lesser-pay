@@ -2,7 +2,9 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "none",
-    "strict": false,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
     "noEmit": false,
     "rootDir": "client/ts",
     "outDir": "client/js",
@@ -10,5 +12,5 @@
     "types": [],
     "lib": ["ES2020", "DOM"]
   },
-  "include": ["client/ts/**/*.ts"]
+  "include": ["client/ts/**/*.ts", "shared/**/*.d.ts"]
 }

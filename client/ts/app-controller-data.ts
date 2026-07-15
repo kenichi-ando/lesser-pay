@@ -1,7 +1,165 @@
+/// <reference path="../../shared/contracts.d.ts" />
+
+function isStandaloneMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.navigator?.standalone === true) return true;
+  if (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches) return true;
+  return false;
+}
+
+function isIosDevice(): boolean {
+  const ua = (navigator.userAgent || '') + ' ' + (navigator.platform || '');
+  // iPadOS 13+ reports as "MacIntel" but exposes touch — treat that as iOS too.
+  if (/iPhone|iPad|iPod/.test(ua)) return true;
+  if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+
+function getNotificationPermission(): NotificationPermission | 'unsupported' {
+  return (typeof Notification !== 'undefined' && Notification.permission) ? Notification.permission : 'unsupported';
+}
+
+function base64UrlToUint8Array(base64Url: string): Uint8Array {
+  const padding = '='.repeat((4 - base64Url.length % 4) % 4);
+  const source = base64Url + padding;
+  let base64 = '';
+  for (const ch of source) {
+    if (ch === '-') base64 += '+';
+    else if (ch === '_') base64 += '/';
+    else base64 += ch;
+  }
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  let i = 0;
+  for (const ch of raw) {
+    out[i++] = ch.codePointAt(0) || 0;
+  }
+  return out;
+}
+
+function bufferToBase64Url(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (const byte of bytes) {
+    bin += String.fromCodePoint(byte);
+  }
+  const source = btoa(bin);
+  let base = '';
+  for (const ch of source) {
+    if (ch === '+') base += '-';
+    else if (ch === '/') base += '_';
+    else base += ch;
+  }
+  while (base.endsWith('=')) {
+    base = base.slice(0, -1);
+  }
+  return base;
+}
+
+function detectDeviceType(ua: string, isIpad: boolean, isIphone: boolean, isAndroid: boolean, isMobile: boolean): string {
+  if (isIpad) return 'iPad';
+  if (isIphone) return 'iPhone';
+  if (isAndroid) return isMobile ? 'Android Phone' : 'Android Tablet';
+  if (isMobile) return 'Mobile';
+  return 'Desktop';
+}
+
+function detectOs(isIpad: boolean, isIphone: boolean, isAndroid: boolean, isWindows: boolean, isMac: boolean): string {
+  if (isIpad) return 'iPadOS';
+  if (isIphone) return 'iOS';
+  if (isAndroid) return 'Android';
+  if (isWindows) return 'Windows';
+  if (isMac) return 'macOS';
+  return 'Unknown OS';
+}
+
+function detectBrowser(ua: string): string {
+  if (/Edg\//.test(ua)) return 'Edge';
+  if (/Chrome\//.test(ua) && !/Edg\//.test(ua)) return 'Chrome';
+  if (/Firefox\//.test(ua)) return 'Firefox';
+  if (/Safari\//.test(ua) && !/Chrome\//.test(ua) && !/Edg\//.test(ua)) return 'Safari';
+  return 'Unknown Browser';
+}
+
+function getDeviceLabel(): string {
+  const ua = navigator.userAgent || '';
+  const isIpad = /iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isIphone = /iPhone/.test(ua);
+  const isAndroid = /Android/.test(ua);
+  const isMobile = /Mobile/.test(ua);
+  const isMac = /Macintosh|Mac OS X/.test(ua) && !isIpad;
+  const isWindows = /Windows NT/.test(ua);
+  const deviceType = detectDeviceType(ua, isIpad, isIphone, isAndroid, isMobile);
+  const os = detectOs(isIpad, isIphone, isAndroid, isWindows, isMac);
+  const browser = detectBrowser(ua);
+  return deviceType + ' / ' + os + ' / ' + browser;
+}
+
+async function ensureServiceWorkerRegistered(): Promise<ServiceWorkerRegistration> {
+  const reg = await navigator.serviceWorker.getRegistration('/');
+  if (reg) return reg;
+  const created = await navigator.serviceWorker.register('/sw.js');
+  return created;
+}
+
+function pushSupported(): boolean {
+  if (!('serviceWorker' in navigator) || !('Notification' in window) || !('PushManager' in window)) return false;
+  // iOS only delivers Web Push to installed PWAs. In a regular Safari tab
+  // PushManager exists but subscribe() never fires notifications, so we
+  // disable the toggle to avoid a confusing "enabled but silent" state.
+  if (isIosDevice() && !isStandaloneMode()) return false;
+  return true;
+}
+
+function showInviteError(error: HTMLElement, message: string) {
+  error.textContent = message;
+  error.classList.remove('hidden');
+}
+
+function clearInviteError(error: HTMLElement) {
+  error.classList.add('hidden');
+}
+
+function scheduleInputFocus(input: HTMLInputElement) {
+  setTimeout(function () { input.focus(); }, 50);
+}
+
+function closeInviteModal(modal: HTMLElement) {
+  modal.classList.add('hidden');
+}
+
+function openInviteModal(modal: HTMLElement, input: HTMLInputElement, error: HTMLElement) {
+  clearInviteError(error);
+  modal.classList.remove('hidden');
+  scheduleInputFocus(input);
+}
+
+function normalizeInviteCode(value: string) {
+  return (value || '').trim().toUpperCase();
+}
+
+function getInviteModalElements(modal: HTMLElement): {
+  modalTitle: HTMLElement | null;
+  modalDesc: HTMLElement | null;
+  input: HTMLInputElement | null;
+  submit: HTMLButtonElement | null;
+  cancel: HTMLButtonElement | null;
+  error: HTMLElement | null;
+} {
+  return {
+    modalTitle: modal.querySelector('.modal-title') as HTMLElement | null,
+    modalDesc: modal.querySelector('.modal-desc') as HTMLElement | null,
+    input: modal.querySelector('#invite-token-input') as HTMLInputElement | null,
+    submit: modal.querySelector('#invite-submit-btn') as HTMLButtonElement | null,
+    cancel: modal.querySelector('#invite-cancel-btn') as HTMLButtonElement | null,
+    error: modal.querySelector('#invite-error') as HTMLElement | null
+  };
+}
+
 (function () {
   'use strict';
 
-  function create(deps: any) {
+  function create(deps: LPControllerDataDeps): LPControllerDataApi {
     const CONFIG = deps.CONFIG;
     const store = deps.store;
     const state = deps.state;
@@ -11,10 +169,10 @@
     const withBusy = deps.withBusy;
     let pushSubscribed = false;
 
-    let dataCache = null;
+    let dataCache: { ts: number; tasks: LPTask[]; history: LPHistoryItem[] } | null = null;
 
     function isValidInviteCode(value: string) {
-      const code = (value || '').trim().toUpperCase();
+      const code = normalizeInviteCode(value);
       return CONFIG.INVITE_CODE_PATTERN.test(code);
     }
 
@@ -23,76 +181,6 @@
         super('unauthorized');
         this.name = 'UnauthorizedError';
       }
-    }
-
-    function isStandalone() {
-      if (typeof window === 'undefined') return false;
-      if (window.navigator && (window.navigator as any).standalone === true) return true;
-      if (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches) return true;
-      return false;
-    }
-
-    function isIos() {
-      const ua = (navigator.userAgent || '') + ' ' + (navigator.platform || '');
-      // iPadOS 13+ reports as "MacIntel" but exposes touch — treat that as iOS too.
-      if (/iPhone|iPad|iPod/.test(ua)) return true;
-      if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
-      return false;
-    }
-
-    function pushSupported() {
-      if (!('serviceWorker' in navigator) || !('Notification' in window) || !('PushManager' in window)) return false;
-      // iOS only delivers Web Push to installed PWAs. In a regular Safari tab
-      // PushManager exists but subscribe() never fires notifications, so we
-      // disable the toggle to avoid a confusing "enabled but silent" state.
-      if (isIos() && !isStandalone()) return false;
-      return true;
-    }
-
-    function notificationPermission() {
-      return (typeof Notification !== 'undefined' && Notification.permission) ? Notification.permission : 'unsupported';
-    }
-
-    function base64UrlToUint8Array(base64Url: string) {
-      const padding = '='.repeat((4 - base64Url.length % 4) % 4);
-      const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
-      const raw = atob(base64);
-      const out = new Uint8Array(raw.length);
-      for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-      return out;
-    }
-
-    function bufferToBase64Url(buf: ArrayBuffer) {
-      const bytes = new Uint8Array(buf);
-      let bin = '';
-      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-      return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-    }
-
-    function getDeviceLabel() {
-      const ua = navigator.userAgent || '';
-      const isIpad = /iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      const isIphone = /iPhone/.test(ua);
-      const isAndroid = /Android/.test(ua);
-      const isMobile = /Mobile/.test(ua);
-      const isMac = /Macintosh|Mac OS X/.test(ua) && !isIpad;
-      const isWindows = /Windows NT/.test(ua);
-
-      const deviceType = isIpad ? 'iPad' : isIphone ? 'iPhone' : isAndroid ? (isMobile ? 'Android Phone' : 'Android Tablet') : isMobile ? 'Mobile' : 'Desktop';
-      const os = isIpad ? 'iPadOS' : isIphone ? 'iOS' : isAndroid ? 'Android' : isWindows ? 'Windows' : isMac ? 'macOS' : 'Unknown OS';
-      const browser = /Edg\//.test(ua) ? 'Edge'
-        : /Chrome\//.test(ua) && !/Edg\//.test(ua) ? 'Chrome'
-          : /Firefox\//.test(ua) ? 'Firefox'
-            : /Safari\//.test(ua) && !/Chrome\//.test(ua) && !/Edg\//.test(ua) ? 'Safari'
-              : 'Unknown Browser';
-      return deviceType + ' / ' + os + ' / ' + browser;
-    }
-
-    async function ensureServiceWorker() {
-      const reg = await navigator.serviceWorker.getRegistration('/');
-      if (reg) return reg;
-      const created = await navigator.serviceWorker.register('/sw.js');
-      return created;
     }
 
     async function syncPushSubscription(reg: ServiceWorkerRegistration) {
@@ -116,11 +204,12 @@
 
     async function refreshPushSubscriptionRole() {
       if (!pushSupported()) return;
-      if (!state.pushConfig || !state.pushConfig.enabled || !state.pushConfig.publicKey) return;
+      if (!isPushConfigured()) return;
       try {
-        const reg = await ensureServiceWorker();
+        const reg = await ensureServiceWorkerRegistered();
         await syncPushSubscription(reg);
-      } catch (_err) {
+      } catch (err) {
+        console.warn('push role refresh failed', err);
         // Keep the UI responsive even if push sync fails.
       }
     }
@@ -129,10 +218,14 @@
       pushSubscribed = !!isEnabled;
     }
 
+    function isPushConfigured() {
+      return !!state.pushConfig?.enabled && !!state.pushConfig?.publicKey;
+    }
+
     async function disablePushNotifications() {
       if (!pushSupported()) return;
       try {
-        const reg = await ensureServiceWorker();
+        const reg = await ensureServiceWorkerRegistered();
         const current = await reg.pushManager.getSubscription();
         if (current) {
           await api('unsubscribePush', { endpoint: current.endpoint });
@@ -141,6 +234,7 @@
         setPushSubscribedState(false);
         deps.toast(tr('push.disabledToast'), 'success');
       } catch (e) {
+        console.warn('disable push failed', e);
         deps.toast(tr('push.failed'), 'error');
       }
     }
@@ -150,8 +244,8 @@
         deps.toast(tr('push.unsupported'), 'error');
         return;
       }
-      if (!state.pushConfig || !state.pushConfig.enabled || !state.pushConfig.publicKey) return;
-      if (notificationPermission() === 'denied') {
+      if (!isPushConfigured()) return;
+      if (getNotificationPermission() === 'denied') {
         deps.toast(tr('push.denied'), 'error');
         store.setPushPromptDismissed();
         return;
@@ -162,45 +256,47 @@
           if (perm === 'denied') store.setPushPromptDismissed();
           return;
         }
-        const reg = await ensureServiceWorker();
+        const reg = await ensureServiceWorkerRegistered();
         const current = await reg.pushManager.getSubscription();
         if (!current) {
           await reg.pushManager.subscribe({
             userVisibleOnly: true,
-            applicationServerKey: base64UrlToUint8Array(state.pushConfig.publicKey)
+            applicationServerKey: base64UrlToUint8Array(state.pushConfig.publicKey) as BufferSource
           });
         }
         await syncPushSubscription(reg);
         setPushSubscribedState(true);
         deps.toast(tr('push.enabledToast'), 'success');
-      } catch (_err) {
+      } catch (err) {
+        console.warn('enable push failed', err);
         deps.toast(tr('push.failed'), 'error');
       }
     }
 
     async function setupPushSubscription() {
       if (!pushSupported()) return;
-      if (!state.pushConfig || !state.pushConfig.enabled || !state.pushConfig.publicKey) return;
+      if (!isPushConfigured()) return;
       try {
-        const reg = await ensureServiceWorker();
+        const reg = await ensureServiceWorkerRegistered();
         const subscribed = await syncPushSubscription(reg);
         setPushSubscribedState(subscribed);
-      } catch (_e) {
+      } catch (err) {
+        console.warn('setup push subscription failed', err);
         setPushSubscribedState(false);
       }
     }
 
     function isPushSupportedNow() {
-      return pushSupported() && !!(state.pushConfig && state.pushConfig.enabled && state.pushConfig.publicKey);
+      return pushSupported() && isPushConfigured();
     }
     function isPushEnabled() {
       return !!pushSubscribed;
     }
 
-    async function api(action: string, payload?: any) {
+    async function api<A extends SharedActionName>(action: A, payload?: Partial<SharedActionPayloadMap[A]>) {
       const token = store.getApiToken();
       if (!token) throw new UnauthorizedError();
-      const body = Object.assign({ action: action }, payload || {});
+      const body: Record<string, unknown> = { action: action, ...payload };
       if (state.user && body.user == null) body.user = state.user;
 
       let res;
@@ -213,7 +309,8 @@
           },
           body: JSON.stringify(body)
         });
-      } catch (_err) {
+      } catch (err) {
+        console.warn('api request failed', err);
         throw new Error(tr('errors.network'));
       }
 
@@ -222,13 +319,16 @@
         throw new UnauthorizedError();
       }
 
-      let data;
+      let data: SharedApiSuccess<A> | SharedApiFailure;
       try {
         data = await res.json();
-      } catch (_err) {
+      } catch (err) {
+        console.warn('api response parse failed', err);
         throw new Error(tr('errors.network') + ' (' + res.status + ')');
       }
-      if (!data.ok) throw new Error(data.error || tr('errors.unknown'));
+      if (!data.ok) {
+        throw new Error((data as SharedApiFailure).error || tr('errors.unknown'));
+      }
       return data;
     }
 
@@ -236,22 +336,109 @@
       dataCache = null;
     }
 
+    function setLoadingState(isLoading: boolean) {
+      state.loading = isLoading;
+      runtime.render();
+    }
+
+    function applyCachedData(cache: { ts: number; tasks: LPTask[]; history: LPHistoryItem[] }) {
+      state.tasks = cache.tasks;
+      state.history = cache.history;
+    }
+
+    function applyFetchedData(now: number, tasks: LPTask[], history: LPHistoryItem[]) {
+      state.tasks = tasks;
+      state.history = history;
+      dataCache = { ts: now, tasks: state.tasks, history: state.history };
+    }
+
+    function handleControllerError(err: unknown): boolean {
+      if (err instanceof UnauthorizedError) {
+        renderLocked();
+        return true;
+      }
+      deps.toast(err instanceof Error ? err.message : tr('errors.unknown'), 'error');
+      return false;
+    }
+
+    async function redeemInviteCode(code: string): Promise<{ ok: true; apiToken: string } | { ok: false; status: number }> {
+      const res = await fetch(CONFIG.API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'redeemInvite', code: code })
+      });
+      let data: { ok?: boolean; apiToken?: string } | null = null;
+      try {
+        data = await res.json();
+      } catch (err) {
+        console.warn('redeemInvite response parse failed', err);
+      }
+      if (!res.ok || !data || !data.ok || typeof data.apiToken !== 'string') {
+        return { ok: false, status: res.status };
+      }
+      return { ok: true, apiToken: data.apiToken };
+    }
+
+    async function submitInviteCode(
+      code: string,
+      submitBtn: HTMLButtonElement,
+      error: HTMLElement
+    ) {
+      await withBusy(submitBtn, { label: tr('locked.submitting') }, async function () {
+        const redeemed = await redeemInviteCode(code);
+        if (!redeemed.ok) {
+          showInviteError(
+            error,
+            redeemed.status === 401 ? tr('locked.invalidCode') : tr('errors.network') + ' (' + redeemed.status + ')'
+          );
+          return;
+        }
+        store.setApiToken(redeemed.apiToken);
+        location.reload();
+      });
+    }
+
+    function applyLockedPanelTexts(
+      lockedTitle: HTMLElement,
+      lockedDesc: HTMLElement,
+      lockedOpen: HTMLButtonElement
+    ) {
+      lockedTitle.textContent = tr('locked.title');
+      lockedDesc.textContent = tr('locked.desc');
+      lockedOpen.textContent = tr('locked.openInput');
+    }
+
+    function applyInviteModalTexts(
+      modalTitle: HTMLElement,
+      modalDesc: HTMLElement,
+      input: HTMLInputElement,
+      cancel: HTMLButtonElement,
+      submit: HTMLButtonElement
+    ) {
+      modalTitle.textContent = tr('locked.openInput');
+      modalDesc.textContent = tr('locked.inputLabel', { n: CONFIG.INVITE_CODE_LENGTH });
+      input.placeholder = tr('locked.inputPlaceholder');
+      cancel.textContent = tr('locked.cancel');
+      submit.textContent = tr('locked.submit');
+    }
+
     // Detect kid-side approvals by diffing against a per-user snapshot of
     // "tasks that were Submitted at the last load", persisted in localStorage
     // so it survives app close/reopen — which is the whole reason we need
     // this: the parent typically approves while the kid isn't looking.
-    function detectNewlyApproved(nextTasks: any[]) {
+    function detectNewlyApproved(nextTasks: LPTask[]) {
       if (state.parentMode || !state.user) return [];
-      const status = (deps.getStatus && deps.getStatus()) || {};
+      const status = deps.getStatus?.() || {};
       const prevSubmitted = new Set(store.getSubmittedSnapshot(state.user));
-      const ids = [];
+      const ids: string[] = [];
       nextTasks.forEach(function (t) {
-        if (t.status === status.APPROVED && prevSubmitted.has(t.id)) ids.push(t.id);
+        const taskId = String(t.id);
+        if (t.status === status.APPROVED && prevSubmitted.has(taskId)) ids.push(taskId);
       });
       return ids;
     }
 
-    function persistSubmittedSnapshot(tasks: any[]) {
+    function persistSubmittedSnapshot(tasks: LPTask[]) {
       if (!state.user) return;
       // The snapshot is the kid's view of "what's still awaiting approval."
       // Parent-mode loads run against the kid's same state.user, so writing
@@ -259,23 +446,23 @@
       // the same device — and the kid would miss the celebration on next
       // load. Skip in parent mode; the kid's next loadData will rewrite it.
       if (state.parentMode) return;
-      const status = (deps.getStatus && deps.getStatus()) || {};
+      const status = deps.getStatus?.() || {};
       const ids = tasks
         .filter(function (t) { return t.status === status.SUBMITTED; })
-        .map(function (t) { return t.id; });
+        .map(function (t) { return String(t.id); });
       store.setSubmittedSnapshot(state.user, ids);
     }
 
     async function refreshServerConfig() {
       const res = await api('getConfig');
-      if (res && res.status) setStatus(res.status);
-      const push = (res && res.push) || {};
+      if (res.status) setStatus(res.status);
+      const push = res.push || { enabled: false, publicKey: '' };
       state.pushConfig = {
         enabled: !!push.enabled,
         publicKey: typeof push.publicKey === 'string' ? push.publicKey : ''
       };
-      const incoming = Array.isArray(res && res.users) ? res.users : [];
-      state.serverUsers = incoming.filter(function (u) {
+      const incoming = Array.isArray(res.users) ? res.users : [];
+      state.serverUsers = incoming.filter(function (u: LPUser) {
         return u && typeof u.key === 'string' && u.key;
       });
       deps.reconcileActiveUser();
@@ -370,74 +557,50 @@
         document.body.appendChild(panel);
         document.body.appendChild(modal);
       }
-      panel.querySelector('.locked-title').textContent = tr('locked.title');
-      panel.querySelector('.locked-desc').textContent = tr('locked.desc');
-      panel.querySelector('#locked-token-open').textContent = tr('locked.openInput');
+      const lockedTitle = panel.querySelector('.locked-title') as HTMLElement | null;
+      const lockedDesc = panel.querySelector('.locked-desc') as HTMLElement | null;
+      const lockedOpen = panel.querySelector('#locked-token-open') as HTMLButtonElement | null;
+      if (!lockedTitle || !lockedDesc || !lockedOpen) return;
+      applyLockedPanelTexts(lockedTitle, lockedDesc, lockedOpen);
 
-      const modal = document.getElementById('invite-modal');
-      modal.querySelector('.modal-title').textContent = tr('locked.openInput');
-      modal.querySelector('.modal-desc').textContent = tr('locked.inputLabel', { n: CONFIG.INVITE_CODE_LENGTH });
-      (modal.querySelector('#invite-token-input') as HTMLInputElement).placeholder = tr('locked.inputPlaceholder');
-      modal.querySelector('#invite-cancel-btn').textContent = tr('locked.cancel');
-      modal.querySelector('#invite-submit-btn').textContent = tr('locked.submit');
+      const modal = document.getElementById('invite-modal') as HTMLElement | null;
+      if (!modal) return;
+      const { modalTitle, modalDesc, input, submit, cancel, error } = getInviteModalElements(modal);
+      if (!modalTitle || !modalDesc || !input || !submit || !cancel || !error) return;
+      applyInviteModalTexts(modalTitle, modalDesc, input, cancel, submit);
 
-      const input = modal.querySelector('#invite-token-input') as HTMLInputElement;
-      const submit = modal.querySelector('#invite-submit-btn') as HTMLButtonElement;
-      const cancel = modal.querySelector('#invite-cancel-btn') as HTMLButtonElement;
-      const error = modal.querySelector('#invite-error') as HTMLElement;
       const submitBtn = submit;
       const redeemInvite = async function () {
-        const code = (input.value || '').trim().toUpperCase();
+        const code = normalizeInviteCode(input.value || '');
         if (!code) {
-          error.textContent = tr('locked.invalid');
-          error.classList.remove('hidden');
+          showInviteError(error, tr('locked.invalid'));
           return;
         }
         if (!isValidInviteCode(code)) {
-          error.textContent = tr('locked.invalidLength', { n: CONFIG.INVITE_CODE_LENGTH });
-          error.classList.remove('hidden');
+          showInviteError(error, tr('locked.invalidLength', { n: CONFIG.INVITE_CODE_LENGTH }));
           return;
         }
         try {
-          await withBusy(submitBtn, { label: tr('locked.submitting') }, async function () {
-            const res = await fetch(CONFIG.API_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'redeemInvite', code: code })
-            });
-            let data = null;
-            try { data = await res.json(); } catch (_e) {}
-            if (!res.ok || !data || !data.ok || typeof data.apiToken !== 'string') {
-              error.textContent = res.status === 401
-                ? tr('locked.invalidCode')
-                : tr('errors.network') + ' (' + res.status + ')';
-              error.classList.remove('hidden');
-              return;
-            }
-            store.setApiToken(data.apiToken);
-            location.reload();
-          });
-        } catch (_err) {
-          error.textContent = tr('errors.network');
-          error.classList.remove('hidden');
+          await submitInviteCode(code, submitBtn, error);
+        } catch (err) {
+          console.warn('redeemInvite request failed', err);
+          showInviteError(error, tr('errors.network'));
         }
       };
-      (panel.querySelector('#locked-token-open') as HTMLButtonElement).onclick = function () {
-        error.classList.add('hidden');
-        modal.classList.remove('hidden');
-        setTimeout(function () { input.focus(); }, 50);
+      lockedOpen.onclick = function () {
+        openInviteModal(modal, input, error);
       };
       submit.onclick = redeemInvite;
-      cancel.onclick = function () { modal.classList.add('hidden'); };
+      cancel.onclick = function () { closeInviteModal(modal); };
       modal.onclick = function (e: MouseEvent) {
-        if (e.target === modal) modal.classList.add('hidden');
+        if (e.target === modal) closeInviteModal(modal);
       };
       input.onkeydown = function (e: KeyboardEvent) {
         if (e.key !== 'Enter') return;
         e.preventDefault();
         redeemInvite();
       };
-      input.oninput = function () { error.classList.add('hidden'); };
+      input.oninput = function () { clearInviteError(error); };
       panel.classList.remove('hidden');
     }
 
@@ -446,21 +609,17 @@
       if (!state.booted || !state.user) return;
       const now = Date.now();
       if (!forced && dataCache && now - dataCache.ts < CONFIG.CACHE_TTL_SEC * 1000) {
-        state.tasks = dataCache.tasks;
-        state.history = dataCache.history;
+        applyCachedData(dataCache);
         await refreshPushSubscriptionRole();
         runtime.render();
         return;
       }
-      state.loading = true;
-      runtime.render();
+      setLoadingState(true);
       try {
         const data = await api('getData');
         const nextTasks = data.tasks || [];
         const approvedIds = detectNewlyApproved(nextTasks);
-        state.tasks = nextTasks;
-        state.history = data.history || [];
-        dataCache = { ts: now, tasks: state.tasks, history: state.history };
+        applyFetchedData(now, nextTasks, data.history || []);
         persistSubmittedSnapshot(nextTasks);
         await refreshPushSubscriptionRole();
         if (approvedIds.length > 0 && deps.onTasksApproved) {
@@ -468,14 +627,9 @@
           setTimeout(function () { deps.onTasksApproved(approvedIds); }, 0);
         }
       } catch (err) {
-        if (err instanceof UnauthorizedError) {
-          renderLocked();
-          return;
-        }
-        deps.toast(err.message, 'error');
+        if (handleControllerError(err)) return;
       } finally {
-        state.loading = false;
-        runtime.render();
+        setLoadingState(false);
       }
     }
 
@@ -498,17 +652,14 @@
           await deps.tryAutoLoginParent();
         }
       } catch (err) {
-        if (err instanceof UnauthorizedError) {
-          renderLocked();
-          return;
-        }
-        deps.toast(err.message, 'error');
+        if (handleControllerError(err)) return;
       }
       if (state.serverUsers.length === 0) {
         deps.toast(tr('setup.needUsers'), 'error');
         return;
       }
-      const hasStoredUser = !!store.getUser() && deps.userKeys().includes(store.getUser());
+      const storedUser = store.getUser();
+      const hasStoredUser = !!storedUser && deps.userKeys().includes(storedUser);
       if (!hasStoredUser) {
         state.booted = true;
         deps.showUserSelection({ closable: false, keepSession: false });
@@ -531,9 +682,9 @@
       disablePush: disablePushNotifications,
       isPushEnabled: isPushEnabled,
       isPushSupported: isPushSupportedNow,
-      pushPermission: notificationPermission
+      pushPermission: getNotificationPermission
     };
   }
 
-  (window as any).LESSERPAY_CONTROLLER_DATA = { create: create };
+  window.LESSERPAY_CONTROLLER_DATA = { create: create };
 })();

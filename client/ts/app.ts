@@ -1,22 +1,22 @@
 (function () {
   'use strict';
 
-  const CONFIG = (window as any).LESSERPAY_CONFIG;
+  const CONFIG = window.LESSERPAY_CONFIG;
   const SK = CONFIG.STORAGE_KEYS;
-  const STRINGS = (window as any).LESSERPAY_STRINGS || {};
-  const i18n = (window as any).LESSERPAY_I18N.create(STRINGS);
+  const STRINGS = window.LESSERPAY_STRINGS || {};
+  const i18n = window.LESSERPAY_I18N.create(STRINGS);
   const tr = i18n.tr;
   const applyI18n = i18n.applyI18n;
-  const store = (window as any).LESSERPAY_STORE.create(SK);
-  const utils = (window as any).LESSERPAY_UTILS.create({ tr: tr });
+  const store = window.LESSERPAY_STORE.create(SK);
+  const utils = window.LESSERPAY_UTILS.create({ tr: tr });
   const escapeHtml = utils.escapeHtml;
   const formatDate = utils.formatDate;
   const isExpired = utils.isExpired;
   const formatMinutes = utils.formatMinutes;
   const withBusy = utils.withBusy;
 
-  let STATUS = /** @type {Record<string,string>} */ ({});
-  const state = {
+  let STATUS: LPStatusMap = {};
+  const state: LPAppState = {
     user: null,
     serverUsers: [],
     parentMode: false,
@@ -33,57 +33,62 @@
     activeTab: 'tasks'
   };
 
-  const $ = function (id: string) { return document.getElementById(id); };
-  const els = {
-    userLabel: $('user-label'),
-    userPopover: $('user-popover'),
-    userPopoverList: $('user-popover-list'),
-    userSelectScreen: $('user-select-screen'),
-    userSelectList: $('user-select-list'),
-    userSelectCloseBtn: $('user-select-close-btn'),
-    cashoutBtn: $('cashout-btn'),
-    bonusBtn: $('bonus-btn'),
-    tabTasks: $('tab-tasks'),
-    tabHistory: $('tab-history'),
-    tabTasksBadge: $('tab-tasks-badge'),
-    panelTasks: $('panel-tasks'),
-    panelHistory: $('panel-history'),
-    balance: $('balance-amount'),
-    tasksList: $('tasks-list'),
-    historyList: $('history-list'),
-    parentModal: $('parent-modal'),
-    parentPin: $('parent-pin'),
-    parentSubmit: $('parent-submit-btn'),
-    parentCancel: $('parent-cancel-btn'),
-    parentError: $('parent-error'),
-    cashoutModal: $('cashout-modal'),
-    cashoutAmount: $('cashout-amount'),
-    cashoutSubmit: $('cashout-submit-btn'),
-    cashoutCancel: $('cashout-cancel-btn'),
-    cashoutError: $('cashout-error'),
-    cashoutBalance: $('cashout-balance'),
-    bonusModal: $('bonus-modal'),
-    bonusLabel: $('bonus-label'),
-    bonusAmount: $('bonus-amount'),
-    bonusSubmit: $('bonus-submit-btn'),
-    bonusCancel: $('bonus-cancel-btn'),
-    bonusError: $('bonus-error'),
-    settingsModal: $('settings-modal'),
-    settingsClose: $('settings-close-btn'),
-    settingsPushRow: $('settings-push-row'),
-    settingsPushToggle: $('settings-push-toggle'),
-    settingsSoundRow: $('settings-sound-row'),
-    settingsSoundToggle: $('settings-sound-toggle'),
-    pullIndicator: $('pull-indicator'),
-    toast: $('toast')
+  function mustElement<T extends HTMLElement>(id: string): T {
+    const node = document.getElementById(id);
+    if (!(node instanceof HTMLElement)) throw new Error('Missing element: ' + id);
+    return node as T;
+  }
+
+  const els: LPElements = {
+    userLabel: mustElement('user-label'),
+    userPopover: mustElement('user-popover'),
+    userPopoverList: mustElement('user-popover-list'),
+    userSelectScreen: mustElement('user-select-screen'),
+    userSelectList: mustElement('user-select-list'),
+    userSelectCloseBtn: mustElement('user-select-close-btn'),
+    cashoutBtn: mustElement('cashout-btn'),
+    bonusBtn: mustElement('bonus-btn'),
+    tabTasks: mustElement('tab-tasks'),
+    tabHistory: mustElement('tab-history'),
+    tabTasksBadge: mustElement('tab-tasks-badge'),
+    panelTasks: mustElement('panel-tasks'),
+    panelHistory: mustElement('panel-history'),
+    balance: mustElement('balance-amount'),
+    tasksList: mustElement('tasks-list'),
+    historyList: mustElement('history-list'),
+    parentModal: mustElement('parent-modal'),
+    parentPin: mustElement<HTMLInputElement>('parent-pin'),
+    parentSubmit: mustElement('parent-submit-btn'),
+    parentCancel: mustElement('parent-cancel-btn'),
+    parentError: mustElement('parent-error'),
+    cashoutModal: mustElement('cashout-modal'),
+    cashoutAmount: mustElement<HTMLInputElement>('cashout-amount'),
+    cashoutSubmit: mustElement('cashout-submit-btn'),
+    cashoutCancel: mustElement('cashout-cancel-btn'),
+    cashoutError: mustElement('cashout-error'),
+    cashoutBalance: mustElement('cashout-balance'),
+    bonusModal: mustElement('bonus-modal'),
+    bonusLabel: mustElement<HTMLInputElement>('bonus-label'),
+    bonusAmount: mustElement<HTMLInputElement>('bonus-amount'),
+    bonusSubmit: mustElement('bonus-submit-btn'),
+    bonusCancel: mustElement('bonus-cancel-btn'),
+    bonusError: mustElement('bonus-error'),
+    settingsModal: mustElement('settings-modal'),
+    settingsClose: document.getElementById('settings-close-btn'),
+    settingsPushRow: document.getElementById('settings-push-row') as HTMLButtonElement | null,
+    settingsPushToggle: document.getElementById('settings-push-toggle'),
+    settingsSoundRow: document.getElementById('settings-sound-row'),
+    settingsSoundToggle: document.getElementById('settings-sound-toggle'),
+    pullIndicator: mustElement('pull-indicator'),
+    toast: mustElement('toast')
   };
 
-  const runtime = {
+  const runtime: LPRuntime = {
     render: function () {},
     renderTabs: function () {}
   };
 
-  const controller = (window as any).LESSERPAY_CONTROLLER.create({
+  const controller = window.LESSERPAY_CONTROLLER.create({
     CONFIG: CONFIG,
     store: store,
     state: state,
@@ -97,7 +102,7 @@
     openSettings: function () { openSettingsModal(); }
   });
 
-  const renderer = (window as any).LESSERPAY_RENDER.create({
+  const renderer = window.LESSERPAY_RENDER.create({
     state: state,
     els: els,
     tr: tr,
@@ -119,25 +124,36 @@
     runtime.renderTabs();
   }
 
-  function init() {
-    els.userSelectCloseBtn.addEventListener('click', controller.closeUserSelectionWithoutChanges);
-    els.parentSubmit.addEventListener('click', controller.submitParentLogin);
-    els.parentPin.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') controller.submitParentLogin();
-    });
-    els.parentCancel.addEventListener('click', controller.closeParentModal);
+  function hideModal(modal: HTMLElement): void {
+    modal.classList.add('hidden');
+  }
 
-    els.cashoutBtn.addEventListener('click', controller.openCashoutModal);
-    els.cashoutSubmit.addEventListener('click', controller.submitCashout);
-    els.cashoutCancel.addEventListener('click', function () { els.cashoutModal.classList.add('hidden'); });
+  function isAnyBlockingLayerOpen(): boolean {
+    return (
+      !els.parentModal.classList.contains('hidden') ||
+      !els.cashoutModal.classList.contains('hidden') ||
+      !els.bonusModal.classList.contains('hidden') ||
+      !els.settingsModal.classList.contains('hidden') ||
+      !els.userSelectScreen.classList.contains('hidden')
+    );
+  }
 
-    els.bonusBtn.addEventListener('click', controller.openBonusModal);
-    els.bonusSubmit.addEventListener('click', controller.submitBonus);
-    els.bonusCancel.addEventListener('click', function () { els.bonusModal.classList.add('hidden'); });
-
+  function registerTabHandlers(): void {
     els.tabTasks.addEventListener('click', function () { switchTab('tasks'); });
     els.tabHistory.addEventListener('click', function () { switchTab('history'); });
+  }
 
+  function registerModalBackdropCloseHandlers(): void {
+    [els.parentModal, els.cashoutModal, els.bonusModal, els.settingsModal].forEach(function (m) {
+      m.addEventListener('click', function (e) {
+        if (e.target !== m) return;
+        if (m === els.parentModal) controller.closeParentModal();
+        else hideModal(m);
+      });
+    });
+  }
+
+  function registerUserPopoverHandlers(): void {
     els.userLabel.addEventListener('click', function (e) {
       e.stopPropagation();
       controller.toggleUserPopover();
@@ -148,27 +164,59 @@
         controller.closeUserPopover();
       }
     });
+  }
 
-    [els.parentModal, els.cashoutModal, els.bonusModal, els.settingsModal].forEach(function (m) {
-      m.addEventListener('click', function (e) {
-        if (e.target !== m) return;
-        if (m === els.parentModal) controller.closeParentModal();
-        else m.classList.add('hidden');
-      });
+  function registerParentModalHandlers(): void {
+    els.userSelectCloseBtn.addEventListener('click', controller.closeUserSelectionWithoutChanges);
+    els.parentSubmit.addEventListener('click', controller.submitParentLogin);
+    els.parentPin.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') controller.submitParentLogin();
     });
+    els.parentCancel.addEventListener('click', controller.closeParentModal);
+  }
 
+  function registerCashoutHandlers(): void {
+    els.cashoutBtn.addEventListener('click', controller.openCashoutModal);
+    els.cashoutSubmit.addEventListener('click', controller.submitCashout);
+    els.cashoutCancel.addEventListener('click', function () { hideModal(els.cashoutModal); });
+  }
+
+  function registerBonusHandlers(): void {
+    els.bonusBtn.addEventListener('click', controller.openBonusModal);
+    els.bonusSubmit.addEventListener('click', controller.submitBonus);
+    els.bonusCancel.addEventListener('click', function () { hideModal(els.bonusModal); });
+  }
+
+  function registerSettingsHandlers(): void {
     if (els.settingsClose) els.settingsClose.addEventListener('click', function () {
-      els.settingsModal.classList.add('hidden');
+      hideModal(els.settingsModal);
     });
     if (els.settingsPushRow) els.settingsPushRow.addEventListener('click', onTogglePush);
     if (els.settingsSoundRow) els.settingsSoundRow.addEventListener('click', onToggleSound);
+  }
 
+  function runAppStartupSequence(): void {
     applyI18n();
     controller.bootstrap();
     setupBadgeClear();
     setupSoundUnlock();
     setupPullToRefresh();
     setupServiceWorkerMessages();
+  }
+
+  function getSoundController(): LPSoundController | undefined {
+    return window.LESSERPAY_SOUND as LPSoundController | undefined;
+  }
+
+  function init() {
+    registerParentModalHandlers();
+    registerCashoutHandlers();
+    registerBonusHandlers();
+    registerTabHandlers();
+    registerUserPopoverHandlers();
+    registerModalBackdropCloseHandlers();
+    registerSettingsHandlers();
+    runAppStartupSequence();
   }
 
   // ---- Settings ----
@@ -186,7 +234,7 @@
       els.settingsPushRow.style.opacity = supported ? '' : '0.55';
       els.settingsPushRow.style.pointerEvents = supported ? '' : 'none';
     }
-    const sound = window.LESSERPAY_SOUND as any;
+    const sound = getSoundController();
     const soundOn = sound ? !sound.isMuted() : true;
     setToggle(els.settingsSoundToggle, soundOn);
   }
@@ -208,7 +256,7 @@
   }
 
   function onToggleSound() {
-    const sound = window.LESSERPAY_SOUND as any;
+    const sound = getSoundController();
     if (!sound) return;
     const muted = sound.toggleMuted();
     if (!muted) sound.play('toggle');
@@ -230,7 +278,7 @@
   // ---- Pull-to-refresh ----
   function setupPullToRefresh() {
     if (!els.pullIndicator) return;
-    let startY = null;
+    let startY: number | null = null;
     let pulling = false;
     let dy = 0;
     const THRESHOLD = 70;
@@ -248,13 +296,9 @@
     document.addEventListener('touchstart', function (e) {
       if (refreshing) return;
       if (window.scrollY > 0) return;
-      if (!e.touches || e.touches.length !== 1) return;
+      if (e.touches?.length !== 1) return;
       // Skip if a modal/user-select is open
-      if (!els.parentModal.classList.contains('hidden')) return;
-      if (!els.cashoutModal.classList.contains('hidden')) return;
-      if (!els.bonusModal.classList.contains('hidden')) return;
-      if (!els.settingsModal.classList.contains('hidden')) return;
-      if (!els.userSelectScreen.classList.contains('hidden')) return;
+      if (isAnyBlockingLayerOpen()) return;
       startY = e.touches[0].clientY;
       pulling = true;
       dy = 0;
@@ -307,10 +351,11 @@
   }
 
   function setupSoundUnlock() {
-    const sound = window.LESSERPAY_SOUND as any;
+    const sound = getSoundController();
     if (!sound) return;
+    const unlockedSound: LPSoundController = sound;
     function unlock() {
-      sound.unlock();
+      unlockedSound.unlock();
       document.removeEventListener('pointerdown', unlock);
       document.removeEventListener('keydown', unlock);
     }
@@ -318,18 +363,25 @@
     document.addEventListener('keydown', unlock);
   }
 
+  function canClearAppBadge(): boolean {
+    return typeof navigator !== 'undefined' && 'clearAppBadge' in navigator;
+  }
+
+  function postClearBadgeToServiceWorker(): void {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.ready.then(function (reg) {
+      reg?.active?.postMessage({ type: 'clearBadge' });
+    }).catch(function () {});
+  }
+
   function clearBadge() {
-    if (typeof navigator !== 'undefined' && 'clearAppBadge' in navigator) {
+    if (canClearAppBadge()) {
       navigator.clearAppBadge().catch(function () {});
     }
     // Reach the service worker even on first load (controller is null until
     // the first navigation through it). serviceWorker.ready resolves with the
     // active registration regardless.
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then(function (reg) {
-        if (reg && reg.active) reg.active.postMessage({ type: 'clearBadge' });
-      }).catch(function () {});
-    }
+    postClearBadgeToServiceWorker();
   }
 
   function setupBadgeClear() {

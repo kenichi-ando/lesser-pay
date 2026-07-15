@@ -41,5 +41,5 @@
 			"node"
 		]
 	},
-	"include": ["server/**/*.ts"]
+	"include": ["server/**/*.ts", "shared/**/*.ts", "shared/**/*.d.ts"]
 }

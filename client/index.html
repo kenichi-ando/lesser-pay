@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#b6562d" />
   <meta name="description" content="家族で使うかわいい報酬管理アプリ" />
   <title>LesserPay</title>
@@ -30,7 +30,7 @@
     <div class="user-select-card">
       <button id="user-select-close-btn" class="user-select-close-btn hidden" type="button" data-i18n-attr-aria-label="userSelect.close">✕</button>
       <svg class="user-select-mascot" width="80" height="80" aria-hidden="true"><use href="#lesser-panda"/></svg>
-      <h2 class="user-select-title" data-i18n="userSelect.title"></h2>
+      <h2 class="user-select-title" data-i18n="userSelect.title">ユーザー選択</h2>
       <p class="user-select-desc" data-i18n="userSelect.desc"></p>
       <div id="user-select-list" class="user-select-list"></div>
     </div>
@@ -96,11 +96,12 @@
 
   </main>
 
-  <div id="parent-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <dialog id="parent-modal" class="modal hidden" aria-modal="true">
     <div class="modal-content">
       <svg class="modal-mascot" width="64" height="64"><use href="#lesser-panda"/></svg>
-      <h3 class="modal-title" data-i18n="parent.title"></h3>
+      <h3 class="modal-title" data-i18n="parent.title">保護者ログイン</h3>
       <p class="modal-desc" data-i18n="parent.desc"></p>
+      <label for="parent-pin" class="sr-only" data-i18n="parent.title">保護者PIN</label>
       <input type="password" id="parent-pin" class="modal-input" inputmode="numeric" autocomplete="off" />
       <div class="modal-actions">
         <button id="parent-cancel-btn" class="btn btn-secondary" data-i18n="parent.cancel"></button>
@@ -108,12 +109,12 @@
       </div>
       <div id="parent-error" class="modal-error hidden"></div>
     </div>
-  </div>
+  </dialog>
 
-  <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <dialog id="settings-modal" class="modal hidden" aria-modal="true">
     <div class="modal-content">
       <svg class="modal-mascot" width="64" height="64"><use href="#lesser-panda"/></svg>
-      <h3 class="modal-title" data-i18n="settings.title"></h3>
+      <h3 class="modal-title" data-i18n="settings.title">設定</h3>
       <p class="modal-desc" data-i18n="settings.desc"></p>
       <div class="settings-list">
         <button id="settings-push-row" class="settings-row" type="button">
@@ -135,14 +136,15 @@
         <button id="settings-close-btn" class="btn btn-primary" data-i18n="settings.close"></button>
       </div>
     </div>
-  </div>
+  </dialog>
 
-  <div id="cashout-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <dialog id="cashout-modal" class="modal hidden" aria-modal="true">
     <div class="modal-content">
       <svg class="modal-mascot" width="64" height="64"><use href="#lesser-panda"/></svg>
-      <h3 class="modal-title" data-i18n="cashout.title"></h3>
+      <h3 class="modal-title" data-i18n="cashout.title">ポイント消費</h3>
       <p class="modal-desc" data-i18n="cashout.desc"></p>
       <div id="cashout-balance" class="cashout-balance"></div>
+      <label for="cashout-amount" class="sr-only" data-i18n="cashout.submit">消費ポイント</label>
       <input type="number" id="cashout-amount" class="modal-input" inputmode="numeric" min="1" placeholder="500" />
       <div class="modal-actions">
         <button id="cashout-cancel-btn" class="btn btn-secondary" data-i18n="cashout.cancel"></button>
@@ -150,14 +152,16 @@
       </div>
       <div id="cashout-error" class="modal-error hidden"></div>
     </div>
-  </div>
+  </dialog>
 
-  <div id="bonus-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <dialog id="bonus-modal" class="modal hidden" aria-modal="true">
     <div class="modal-content">
       <svg class="modal-mascot" width="64" height="64"><use href="#lesser-panda"/></svg>
-      <h3 class="modal-title" data-i18n="bonus.title"></h3>
+      <h3 class="modal-title" data-i18n="bonus.title">ボーナス付与</h3>
       <p class="modal-desc" data-i18n="bonus.desc"></p>
+      <label for="bonus-label" class="sr-only" data-i18n="bonus.labelPlaceholder">内容</label>
       <input type="text" id="bonus-label" class="modal-input" maxlength="80" data-i18n-attr-placeholder="bonus.labelPlaceholder" autocomplete="off" />
+      <label for="bonus-amount" class="sr-only" data-i18n="bonus.pointsPlaceholder">ポイント</label>
       <input type="number" id="bonus-amount" class="modal-input" inputmode="numeric" min="1" data-i18n-attr-placeholder="bonus.pointsPlaceholder" />
       <div class="modal-actions">
         <button id="bonus-cancel-btn" class="btn btn-secondary" data-i18n="bonus.cancel"></button>
@@ -165,9 +169,9 @@
       </div>
       <div id="bonus-error" class="modal-error hidden"></div>
     </div>
-  </div>
+  </dialog>
 
-  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <output id="toast" class="toast hidden" aria-live="polite"></output>
 
   <script src="js/config.js"></script>
   <script src="js/strings.js"></script>

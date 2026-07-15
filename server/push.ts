@@ -35,6 +35,24 @@ interface StoredSubscription {
 
 export type PushRole = "child" | "parent";
 
+function consumePushError(_error: unknown): void {
+	if (_error === undefined) return;
+}
+
+function toText(value: unknown): string {
+	if (value == null) return "";
+	if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+	if (typeof value === "bigint" || typeof value === "symbol") return String(value);
+	if (value instanceof Date) return String(value);
+	try {
+		const json = JSON.stringify(value);
+		return json ?? "";
+	} catch (err) {
+		consumePushError(err);
+		return "";
+	}
+}
+
 export function getPushPublicKey(env: Env): string {
 	const key = (env.PUSH_VAPID_PUBLIC_KEY ?? "").trim();
 	return key;
@@ -65,9 +83,9 @@ export async function upsertPushSubscription(
 	deviceLabelRaw?: unknown,
 ): Promise<void> {
 	if (!pushEnabled(env)) return;
-	const endpoint = String(subscription.endpoint ?? "").trim();
-	const p256dh = String(subscription.keys?.p256dh ?? "").trim();
-	const auth = String(subscription.keys?.auth ?? "").trim();
+	const endpoint = toText(subscription.endpoint).trim();
+	const p256dh = toText(subscription.keys?.p256dh).trim();
+	const auth = toText(subscription.keys?.auth).trim();
 	if (!endpoint || !p256dh || !auth) return;
 
 	const token = await getAccessToken(env);
@@ -112,7 +130,7 @@ export async function upsertPushSubscription(
 
 export async function removePushSubscription(env: Env, endpointRaw: unknown): Promise<void> {
 	if (!pushEnabled(env)) return;
-	const endpoint = String(endpointRaw ?? "").trim();
+	const endpoint = toText(endpointRaw).trim();
 	if (!endpoint) return;
 	const token = await getAccessToken(env);
 	await ensurePushSheet(env, token);
@@ -135,8 +153,22 @@ export async function notifyViaPush(
 	await ensurePushSheet(env, token);
 	const rows = await readPushRows(env, token);
 	if (rows.length === 0) return;
-	const targetEndpoint = String(targetEndpointRaw ?? "").trim();
+	const targetEndpoint = toText(targetEndpointRaw).trim();
+	const deduped = dedupeSubscriptions(rows, targetRole, targetUser, targetEndpoint);
 
+	const pub = getPushPublicKey(env);
+	const plaintext = new TextEncoder().encode(JSON.stringify({ title, body }));
+	for (const row of deduped.values()) {
+		await sendPushToRow(env, token, pub, plaintext, row, title, body);
+	}
+}
+
+function dedupeSubscriptions(
+	rows: StoredSubscription[],
+	targetRole?: PushRole,
+	targetUser?: string,
+	targetEndpoint?: string,
+): Map<string, StoredSubscription> {
 	const deduped = new Map<string, StoredSubscription>();
 	for (const row of rows) {
 		if (targetRole && row.role !== targetRole) continue;
@@ -144,29 +176,36 @@ export async function notifyViaPush(
 		if (targetEndpoint && row.endpoint !== targetEndpoint) continue;
 		deduped.set(row.endpoint, row);
 	}
+	return deduped;
+}
 
-	const pub = getPushPublicKey(env);
-	const plaintext = new TextEncoder().encode(JSON.stringify({ title, body }));
-	for (const row of deduped.values()) {
-		try {
-			const encrypted = await encryptPayload(plaintext, row.p256dh, row.auth);
-			const vapidToken = await buildVapidJwt(env, row.endpoint);
-			const res = await sendWebPush(row.endpoint, vapidToken, pub, encrypted);
-			// 404/410 means expired subscription, so prune it.
-			if (res.status === 404 || res.status === 410) {
-				await clearPushRow(env, token, row.rowIndex);
-				continue;
-			}
-			if (!res.ok) {
-				console.warn("Push send failed:", res.status, await res.text());
-			}
-		} catch (e) {
-			console.warn(
-				"Push send exception:",
-				e instanceof Error ? e.message : String(e),
-				`(title=${title}, body=${body.slice(0, 60)})`,
-			);
+async function sendPushToRow(
+	env: Env,
+	token: string,
+	pub: string,
+	plaintext: Uint8Array,
+	row: StoredSubscription,
+	title: string,
+	body: string,
+): Promise<void> {
+	try {
+		const encrypted = await encryptPayload(plaintext, row.p256dh, row.auth);
+		const vapidToken = await buildVapidJwt(env, row.endpoint);
+		const res = await sendWebPush(row.endpoint, vapidToken, pub, encrypted);
+		// 404/410 means expired subscription, so prune it.
+		if (res.status === 404 || res.status === 410) {
+			await clearPushRow(env, token, row.rowIndex);
+			return;
 		}
+		if (!res.ok) {
+			console.warn("Push send failed:", res.status, await res.text());
+		}
+	} catch (e) {
+		console.warn(
+			"Push send exception:",
+			e instanceof Error ? e.message : toText(e),
+			`(title=${title}, body=${body.slice(0, 60)})`,
+		);
 	}
 }
 
@@ -406,14 +445,14 @@ function trimAndPad(input: Uint8Array, size: number): Uint8Array {
 
 function base64UrlToBytes(value: string): Uint8Array {
 	const padding = "=".repeat((4 - (value.length % 4)) % 4);
-	const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
-	return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+	const base64 = (value + padding).replaceAll("-", "+").replaceAll("_", "/");
+	return Uint8Array.from(atob(base64), (c) => c.codePointAt(0) ?? 0);
 }
 
 function bytesToBase64Url(bytes: Uint8Array): string {
 	let bin = "";
-	for (const b of bytes) bin += String.fromCharCode(b);
-	return btoa(bin).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+	for (const b of bytes) bin += String.fromCodePoint(b);
+	return btoa(bin).replaceAll("=", "").replaceAll("+", "-").replaceAll("/", "_");
 }
 
 async function ensurePushSheet(env: Env, token: string): Promise<void> {
@@ -471,12 +510,12 @@ async function readPushRows(env: Env, token: string): Promise<StoredSubscription
 	const values = body.values ?? [];
 	return values
 		.map((row, i) => {
-			const endpoint = String(row[0] ?? "").trim();
-			const p256dh = String(row[1] ?? "").trim();
-			const auth = String(row[2] ?? "").trim();
-			const user = String(row[3] ?? "").trim();
+			const endpoint = toText(row[0]).trim();
+			const p256dh = toText(row[1]).trim();
+			const auth = toText(row[2]).trim();
+			const user = toText(row[3]).trim();
 			const role = normalizePushRole(row[4]);
-			const deviceLabel = String(row[5] ?? "").trim();
+			const deviceLabel = toText(row[5]).trim();
 			return { rowIndex: i + 2, endpoint, p256dh, auth, user, role, deviceLabel };
 		})
 		.filter((row) => row.endpoint && row.p256dh && row.auth);
@@ -533,7 +572,7 @@ async function readPushCreatedAt(env: Env, token: string, rowIndex: number): Pro
 	const createdAtRes = await fetch(createdAtUrl, { headers: { Authorization: `Bearer ${token}` } });
 	if (createdAtRes.ok) {
 		const body = (await createdAtRes.json()) as { values?: unknown[][] };
-		const createdAt = String(body.values?.[0]?.[0] ?? "");
+		const createdAt = toText(body.values?.[0]?.[0]);
 		if (createdAt) return createdAt;
 	}
 	// Backward compatibility for rows written before deviceLabel was added.
@@ -542,7 +581,7 @@ async function readPushCreatedAt(env: Env, token: string, rowIndex: number): Pro
 	const res = await fetch(legacyUrl, { headers: { Authorization: `Bearer ${token}` } });
 	if (!res.ok) return "";
 	const body = (await res.json()) as { values?: unknown[][] };
-	return String(body.values?.[0]?.[0] ?? "");
+	return toText(body.values?.[0]?.[0]);
 }
 
 async function clearPushRow(env: Env, token: string, rowIndex: number): Promise<void> {

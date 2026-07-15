@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  function create(deps: any) {
+  function create(deps: LPControllerDeps): LPControllerApi {
     const store = deps.store;
     const state = deps.state;
     const els = deps.els;
@@ -9,6 +9,7 @@
     const escapeHtml = deps.escapeHtml;
     const runtime = deps.runtime;
     const withBusy = deps.withBusy;
+    let controllerData: LPControllerDataApi | null = null;
 
     function userKeys() {
       return state.serverUsers.map(function (u) { return u.key; });
@@ -19,6 +20,25 @@
       return found ? found.label : key;
     }
 
+    function clearParentSession() {
+      state.parentMode = false;
+      state.parentPin = null;
+      store.clearParentMode();
+    }
+
+    function setParentSession(pin: string, persistPin: boolean) {
+      state.parentPin = pin;
+      state.parentMode = true;
+      if (persistPin) store.setParentPin(pin);
+      store.setParentMode(true);
+    }
+
+    function resetUserDataView() {
+      controllerData?.clearDataCache();
+      state.tasks = [];
+      state.history = [];
+    }
+
     function reconcileActiveUser() {
       const keys = userKeys();
       if (keys.length === 0) {
@@ -27,42 +47,36 @@
         return;
       }
       if (!state.user || !keys.includes(state.user)) {
-        state.user = keys[0];
-        store.setUser(state.user);
-        state.parentMode = false;
-        state.parentPin = null;
-        store.clearParentMode();
-        data.clearDataCache();
-        state.tasks = [];
-        state.history = [];
+        const nextUser = keys[0];
+        state.user = nextUser;
+        store.setUser(nextUser);
+        clearParentSession();
+        resetUserDataView();
       }
     }
 
-    function renderUserPopover() {
-      if (state.serverUsers.length === 0) {
-        els.userPopoverList.innerHTML = '<li class="user-popover-empty">' + escapeHtml(tr('setup.needUsers')) + '</li>';
-        return;
-      }
+    function buildUserPopoverChildItems(): string {
+      if (!state.parentMode) return '';
+      return state.serverUsers.map(function (_ref) {
+        const key = _ref.key;
+        const label = _ref.label;
+        const isCurrent = key === state.user;
+        return '\n<li class="user-popover-item ' + (isCurrent ? 'is-current' : '') + '">\n' +
+          '  <button class="user-popover-pick" type="button" data-user="' + escapeHtml(key) + '">\n' +
+          '    <span class="user-popover-mark">' + (isCurrent ? '✓' : '') + '</span>\n' +
+          '    <span class="user-popover-name">' + escapeHtml(label) + '</span>\n' +
+          '  </button>\n' +
+          '</li>\n';
+      }).join('');
+    }
 
-      const childItems = state.parentMode ? state.serverUsers.map(function (_ref) {
-          const key = _ref.key;
-          const label = _ref.label;
-          const isCurrent = key === state.user;
-          return '\n<li class="user-popover-item ' + (isCurrent ? 'is-current' : '') + '">\n' +
-            '  <button class="user-popover-pick" type="button" data-user="' + escapeHtml(key) + '">\n' +
-            '    <span class="user-popover-mark">' + (isCurrent ? '✓' : '') + '</span>\n' +
-            '    <span class="user-popover-name">' + escapeHtml(label) + '</span>\n' +
-            '  </button>\n' +
-            '</li>\n';
-        }).join('') : '';
-
+    function buildUserPopoverHtml(): string {
+      const childItems = buildUserPopoverChildItems();
       const header = state.parentMode
         ? '<li class="user-popover-group-title">' + escapeHtml(tr('users.childSwitchTitle')) + '</li>'
         : '';
       const divider = state.parentMode ? '<li class="user-popover-divider" aria-hidden="true"></li>' : '';
-
-      els.userPopoverList.innerHTML =
-        header + childItems + divider +
+      return header + childItems + divider +
         '<li class="user-popover-item">' +
         '  <button class="user-popover-pick user-popover-login-switch" type="button" data-action="switch-login-user">' +
         '    <span class="user-popover-name">👤 ' + escapeHtml(tr('users.loginSwitch')) + '</span>' +
@@ -73,23 +87,42 @@
         '    <span class="user-popover-name">⚙️ ' + escapeHtml(tr('settings.open')) + '</span>' +
         '  </button>' +
         '</li>';
+    }
 
+    function bindUserPopoverHandlers() {
       els.userPopoverList.querySelectorAll('[data-user]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          switchUser(btn.dataset.user, { keepParentMode: true, toastKey: 'users.switchedDisplayToast' });
-        });
+        btn.addEventListener('click', onPopoverUserPick);
       });
       const loginSwitchBtn = els.userPopoverList.querySelector('[data-action="switch-login-user"]');
       if (loginSwitchBtn) {
-        loginSwitchBtn.addEventListener('click', function () {
-          void openLoginUserSelection();
-        });
+        loginSwitchBtn.addEventListener('click', onLoginSwitchClick);
       }
       const settingsBtn = els.userPopoverList.querySelector('[data-action="open-settings"]');
-      if (settingsBtn) settingsBtn.addEventListener('click', function () {
-        closeUserPopover();
-        if (deps.openSettings) deps.openSettings();
-      });
+      if (settingsBtn) settingsBtn.addEventListener('click', onOpenSettingsClick);
+    }
+
+    function renderUserPopover() {
+      if (state.serverUsers.length === 0) {
+        els.userPopoverList.innerHTML = '<li class="user-popover-empty">' + escapeHtml(tr('setup.needUsers')) + '</li>';
+        return;
+      }
+      els.userPopoverList.innerHTML = buildUserPopoverHtml();
+      bindUserPopoverHandlers();
+    }
+
+    function onPopoverUserPick(e: Event) {
+      const target = e.currentTarget as HTMLElement | null;
+      const picked = target?.dataset.user || '';
+      void switchUser(picked, { keepParentMode: true, toastKey: 'users.switchedDisplayToast' });
+    }
+
+    function onLoginSwitchClick() {
+      void openLoginUserSelection();
+    }
+
+    function onOpenSettingsClick() {
+      closeUserPopover();
+      if (deps.openSettings) deps.openSettings();
     }
 
     function closeUserPopover() {
@@ -110,10 +143,48 @@
       try {
         await data.refreshServerConfig();
       } catch (err) {
-        actions.toast(err && err.message ? err.message : tr('errors.network'), 'error');
+        actions.toast(err instanceof Error && err.message ? err.message : tr('errors.network'), 'error');
       }
+      showUserSelection(makeLoginUserSelectionOptions());
+    }
+
+    function buildUserSelectionHtml(currentSelection: string | null): string {
+      const users = state.serverUsers.map(function (_ref2) {
+        const key = _ref2.key;
+        const label = _ref2.label;
+        const currentClass = key === currentSelection ? ' is-current' : '';
+        return '<button class="user-select-btn' + currentClass + '" type="button" data-user-select="' + escapeHtml(key) + '">' +
+          '<span class="user-select-icon" aria-hidden="true">🐾</span>' +
+          '<span>' + escapeHtml(label) + '</span></button>';
+      }).join('');
+      const parentCurrentClass = currentSelection === '__parent__' ? ' is-current' : '';
+      const parentBtn = '<button class="user-select-btn is-parent' + parentCurrentClass + '" type="button" data-user-select="__parent__">' +
+        '<span class="user-select-key" aria-hidden="true">🔑</span>' +
+        '<span>' + escapeHtml(tr('userSelect.parent')) + '</span></button>';
+      return users + parentBtn;
+    }
+
+    function bindUserSelectionHandlers() {
+      els.userSelectList.querySelectorAll('[data-user-select]').forEach(function (btn) {
+        btn.addEventListener('click', onUserSelectClick);
+      });
+    }
+
+    function getCurrentSelection(): string | null {
+      return state.parentMode ? '__parent__' : state.user;
+    }
+
+    function updateUserSelectionCloseButtonVisibility(): void {
+      els.userSelectCloseBtn.classList.toggle('hidden', !state.userSelectionClosable);
+    }
+
+    function makeLoginUserSelectionOptions(): {
+      closable: boolean;
+      keepSession: boolean;
+      returnState: LPAppState['selectionReturnState'];
+    } {
       const canClose = !!state.user;
-      showUserSelection({
+      return {
         closable: canClose,
         keepSession: canClose,
         returnState: canClose ? {
@@ -121,77 +192,91 @@
           parentMode: state.parentMode,
           parentPin: state.parentPin
         } : null
-      });
+      };
     }
 
-    function showUserSelection(options: any) {
+    function showUserSelection(options: {
+      closable?: boolean;
+      keepSession?: boolean;
+      returnState?: LPAppState['selectionReturnState'];
+    }) {
       const opts = options || {};
       state.needsUserSelection = true;
       state.userSelectionClosable = !!opts.closable;
       state.selectionReturnState = opts.returnState || null;
       closeUserPopover();
       if (!opts.keepSession) {
-        state.parentMode = false;
-        state.parentPin = null;
-        store.clearParentMode();
+        clearParentSession();
       }
-      const currentSelection = state.parentMode ? '__parent__' : state.user;
-      els.userSelectList.innerHTML = state.serverUsers.map(function (_ref2) {
-        const key = _ref2.key;
-        const label = _ref2.label;
-        const currentClass = key === currentSelection ? ' is-current' : '';
-        return '<button class="user-select-btn' + currentClass + '" type="button" data-user-select="' + escapeHtml(key) + '">' +
-          '<span class="user-select-icon" aria-hidden="true">🐾</span>' +
-          '<span>' + escapeHtml(label) + '</span></button>';
-      }).join('') +
-      '<button class="user-select-btn is-parent' + (currentSelection === '__parent__' ? ' is-current' : '') + '" type="button" data-user-select="__parent__">' +
-      '<span class="user-select-key" aria-hidden="true">🔑</span>' +
-      '<span>' + escapeHtml(tr('userSelect.parent')) + '</span></button>';
-      els.userSelectList.querySelectorAll('[data-user-select]').forEach(function (btn) {
-        btn.addEventListener('click', function () { onUserSelect(btn.dataset.userSelect); });
-      });
-      els.userSelectCloseBtn.classList.toggle('hidden', !state.userSelectionClosable);
+      const currentSelection = getCurrentSelection();
+      els.userSelectList.innerHTML = buildUserSelectionHtml(currentSelection);
+      bindUserSelectionHandlers();
+      updateUserSelectionCloseButtonVisibility();
       els.userSelectScreen.classList.remove('hidden');
       runtime.render();
     }
 
-    function hideUserSelection() {
+    function resetUserSelectionState() {
       state.needsUserSelection = false;
       state.userSelectionClosable = false;
       state.selectionReturnState = null;
+    }
+
+    function onUserSelectClick(e: Event) {
+      const target = e.currentTarget as HTMLElement | null;
+      void onUserSelect(target?.dataset.userSelect || '');
+    }
+
+    function hideUserSelection() {
+      resetUserSelectionState();
       els.userSelectScreen.classList.add('hidden');
       runtime.render();
     }
 
+    function restoreSelectionReturnState(): void {
+      if (!state.selectionReturnState) return;
+      state.user = state.selectionReturnState.user;
+      state.parentMode = state.selectionReturnState.parentMode;
+      state.parentPin = state.selectionReturnState.parentPin;
+      if (state.user) store.setUser(state.user);
+    }
+
     function closeUserSelectionWithoutChanges() {
       if (!state.userSelectionClosable) return;
-      if (state.selectionReturnState) {
-        state.user = state.selectionReturnState.user;
-        state.parentMode = state.selectionReturnState.parentMode;
-        state.parentPin = state.selectionReturnState.parentPin;
-        store.setUser(state.user);
-      }
+      restoreSelectionReturnState();
       hideUserSelection();
     }
 
     async function onUserSelect(selection: string) {
       const shouldToast = state.userSelectionClosable;
       if (selection === '__parent__') {
-        state.pendingParentSwitchToast = shouldToast;
-        if (!state.user && state.serverUsers.length > 0) {
-          state.user = state.serverUsers[0].key;
-          store.setUser(state.user);
-        }
-        const autoLoggedIn = await tryAutoLoginParent();
-        if (autoLoggedIn) {
-          hideUserSelection();
-          if (shouldToast) actions.toast(tr('users.switchedParentToast'), 'success');
-          state.pendingParentSwitchToast = false;
-          return;
-        }
-        openParentModal();
+        await selectParentUser(shouldToast);
         return;
       }
+      await selectChildUser(selection, shouldToast);
+    }
+
+    async function selectParentUser(shouldToast: boolean) {
+      state.pendingParentSwitchToast = shouldToast;
+      ensureSelectedUserForParentMode();
+      const autoLoggedIn = await tryAutoLoginParent();
+      if (autoLoggedIn) {
+        hideUserSelection();
+        if (shouldToast) actions.toast(tr('users.switchedParentToast'), 'success');
+        state.pendingParentSwitchToast = false;
+        return;
+      }
+      openParentModal();
+    }
+
+    function ensureSelectedUserForParentMode() {
+      if (state.user || state.serverUsers.length === 0) return;
+      const nextUser = state.serverUsers[0].key;
+      state.user = nextUser;
+      store.setUser(nextUser);
+    }
+
+    async function selectChildUser(selection: string, shouldToast: boolean) {
       await switchUser(selection, {
         silent: !shouldToast,
         toastKey: 'users.switchedLoginToast',
@@ -200,28 +285,29 @@
       hideUserSelection();
     }
 
-    async function switchUser(key: string, options: any) {
+    async function switchUser(key: string, options: {
+      keepParentMode?: boolean;
+      toastKey?: string;
+      silent?: boolean;
+      forceExitParentMode?: boolean;
+    }) {
       const opts = options || {};
       const forceExitParentMode = !!opts.forceExitParentMode;
       const sameUser = key === state.user;
-      if (!key || (sameUser && !(forceExitParentMode && state.parentMode))) {
+      if (!canSwitchUser(key, sameUser, forceExitParentMode)) {
         closeUserPopover();
         return;
       }
       closeUserPopover();
-      const keepParentMode = !!opts.keepParentMode && state.parentMode && !!state.parentPin;
+      const keepParentMode = shouldKeepParentMode(opts);
       if (!sameUser) {
         state.user = key;
         store.setUser(key);
       }
       if (!keepParentMode) {
-        state.parentMode = false;
-        state.parentPin = null;
-        store.clearParentMode();
+        clearParentSession();
       }
-      data.clearDataCache();
-      state.tasks = [];
-      state.history = [];
+      resetUserDataView();
       runtime.render();
       if (!opts.silent) {
         actions.toast(tr(opts.toastKey || 'users.switchedToast', { name: labelOf(key) }), 'success');
@@ -229,14 +315,39 @@
       await data.loadData(true);
     }
 
-    function openParentModal() {
-      els.parentPin.value = '';
+    function canSwitchUser(key: string, sameUser: boolean, forceExitParentMode: boolean) {
+      if (!key) return false;
+      if (!sameUser) return true;
+      return forceExitParentMode && state.parentMode;
+    }
+
+    function shouldKeepParentMode(options: {
+      keepParentMode?: boolean;
+    }) {
+      return !!options.keepParentMode && state.parentMode && !!state.parentPin;
+    }
+
+    function clearParentError() {
       els.parentError.classList.add('hidden');
-      els.parentModal.classList.remove('hidden');
+    }
+
+    function focusParentPinSoon() {
       setTimeout(function () { els.parentPin.focus(); }, 50);
     }
 
-    async function runSubmitWithBusy(button: any, processingLabel: string, submitTask: () => Promise<void>, onError: any) {
+    function openParentModal() {
+      els.parentPin.value = '';
+      clearParentError();
+      els.parentModal.classList.remove('hidden');
+      focusParentPinSoon();
+    }
+
+    async function runSubmitWithBusy(
+      button: HTMLElement,
+      processingLabel: string,
+      submitTask: () => Promise<void>,
+      onError: (err: unknown) => void
+    ) {
       try {
         await withBusy(button, { label: processingLabel }, submitTask);
       } catch (err) {
@@ -250,16 +361,14 @@
       if (!savedPin) return false;
       try {
         await data.api('verifyPin', { pin: savedPin });
-        state.parentPin = savedPin;
-        state.parentMode = true;
-        store.setParentMode(true);
+        setParentSession(savedPin, false);
         await data.refreshPushSubscriptionRole();
         runtime.render();
         return true;
-      } catch (_err) {
+      } catch (err) {
+        console.warn('auto parent login failed', err);
         store.clearParentPin();
-        store.clearParentMode();
-        state.parentPin = null;
+        clearParentSession();
         return false;
       }
     }
@@ -267,8 +376,7 @@
     async function submitParentLogin() {
       const pin = els.parentPin.value;
       if (!pin) {
-        els.parentError.textContent = tr('parent.needPin');
-        els.parentError.classList.remove('hidden');
+        showParentError(tr('parent.needPin'));
         return;
       }
       await runSubmitWithBusy(
@@ -276,33 +384,48 @@
         tr('parent.checking'),
         async function () {
           await data.api('verifyPin', { pin: pin });
-          state.parentPin = pin;
-          state.parentMode = true;
-          store.setParentPin(pin);
-          store.setParentMode(true);
-          await data.refreshPushSubscriptionRole();
-          els.parentModal.classList.add('hidden');
-          hideUserSelection();
-          runtime.render();
-          if (state.pendingParentSwitchToast) {
-            actions.toast(tr('users.switchedParentToast'), 'success');
-          }
+          await onParentLoginSuccess(pin);
         },
-        function (err) {
-          state.parentPin = null;
-          els.parentError.textContent = err.message;
-          els.parentError.classList.remove('hidden');
-        }
+        onParentLoginError
       );
-      state.pendingParentSwitchToast = false;
+      resetParentSwitchToast();
     }
 
     function closeParentModal() {
-      state.pendingParentSwitchToast = false;
+      hideParentModal(true);
+    }
+
+    function showParentError(message: string) {
+      els.parentError.textContent = message;
+      els.parentError.classList.remove('hidden');
+    }
+
+    async function onParentLoginSuccess(pin: string) {
+      setParentSession(pin, true);
+      await data.refreshPushSubscriptionRole();
+      hideParentModal(false);
+      hideUserSelection();
+      runtime.render();
+      if (state.pendingParentSwitchToast) {
+        actions.toast(tr('users.switchedParentToast'), 'success');
+      }
+    }
+
+    function onParentLoginError(err: unknown) {
+      state.parentPin = null;
+      showParentError(err instanceof Error ? err.message : tr('errors.unknown'));
+    }
+
+    function hideParentModal(resetToast: boolean) {
+      if (resetToast) resetParentSwitchToast();
       els.parentModal.classList.add('hidden');
     }
 
-    const data = (window as any).LESSERPAY_CONTROLLER_DATA.create({
+    function resetParentSwitchToast() {
+      state.pendingParentSwitchToast = false;
+    }
+
+    const data = window.LESSERPAY_CONTROLLER_DATA.create({
       CONFIG: deps.CONFIG,
       store: store,
       state: state,
@@ -315,12 +438,13 @@
       showUserSelection: showUserSelection,
       openParentModal: openParentModal,
       tryAutoLoginParent: tryAutoLoginParent,
-      toast: function (msg, kind) { actions.toast(msg, kind); },
+      toast: function (msg: string, kind?: string) { actions.toast(msg, kind); },
       onTasksApproved: function () { actions.celebrateRemoteApprovals(); },
       withBusy: withBusy
     });
+    controllerData = data;
 
-    const actions = (window as any).LESSERPAY_CONTROLLER_ACTIONS.create({
+    const actions = window.LESSERPAY_CONTROLLER_ACTIONS.create({
       state: state,
       els: els,
       tr: tr,
@@ -352,5 +476,5 @@
     };
   }
 
-  (window as any).LESSERPAY_CONTROLLER = { create: create };
+  window.LESSERPAY_CONTROLLER = { create: create };
 })();

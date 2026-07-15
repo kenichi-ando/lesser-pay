@@ -6,6 +6,8 @@
     "client:build": "tsc -p tsconfig.client.json",
     "client:dev": "tsc -p tsconfig.client.json --watch",
     "client:typecheck": "tsc -p tsconfig.client.json --noEmit",
+    "server:typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "npm run client:typecheck && npm run server:typecheck",
     "deploy": "npm run client:build && wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",

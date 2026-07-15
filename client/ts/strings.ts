@@ -107,4 +107,4 @@ const STRINGS = {
   errors: { network: '通信エラー', unknown: '不明なエラー' }
 };
 
-(window as any).LESSERPAY_STRINGS = STRINGS;
+window.LESSERPAY_STRINGS = STRINGS;

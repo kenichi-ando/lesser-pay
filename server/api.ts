@@ -28,6 +28,24 @@ import {
 
 const SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
+function consumeApiError(_error: unknown): void {
+	if (_error === undefined) return;
+}
+
+function toText(v: unknown): string {
+	if (v == null) return "";
+	if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
+	if (typeof v === "bigint" || typeof v === "symbol") return String(v);
+	if (v instanceof Date) return String(v);
+	try {
+		const json = JSON.stringify(v);
+		return json ?? "";
+	} catch (err) {
+		consumeApiError(err);
+		return "";
+	}
+}
+
 // ---------------------------------------------------------------------------
 // OAuth — Service Account JWT → access_token
 // ---------------------------------------------------------------------------
@@ -71,12 +89,12 @@ export async function getAccessToken(env: Env): Promise<string> {
 }
 
 async function importPrivateKey(pem: string): Promise<CryptoKey> {
-	const normalized = pem.replace(/\\n/g, "\n");
+	const normalized = pem.replaceAll(String.raw`\n`, "\n");
 	const b64 = normalized
 		.replace("-----BEGIN PRIVATE KEY-----", "")
 		.replace("-----END PRIVATE KEY-----", "")
 		.replace(/\s+/g, "");
-	const der = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+	const der = Uint8Array.from(atob(b64), (c) => c.codePointAt(0) ?? 0);
 	return crypto.subtle.importKey(
 		"pkcs8",
 		der.buffer as ArrayBuffer,
@@ -202,7 +220,7 @@ export async function findTaskRow(
 
 	for (let i = 0; i < values.length; i++) {
 		const r = values[i];
-		if (String(r[TASK_COL.ID] ?? "") === String(taskId)) {
+		if (toText(r[TASK_COL.ID]) === toText(taskId)) {
 			return { row: r, rowIndex: i + 2 };
 		}
 	}
@@ -272,7 +290,7 @@ export async function readHistoryRows(
 		)
 		.map((r) => ({
 			date: toDateTimeString(r[HISTORY_COL.DATE]),
-			content: String(r[HISTORY_COL.CONTENT] ?? ""),
+			content: toText(r[HISTORY_COL.CONTENT]),
 			points: toNumber(r[HISTORY_COL.POINTS]),
 		}));
 }
@@ -314,10 +332,10 @@ function shapeTasks(rows: unknown[][]) {
 	return rows
 		.filter((r) => nonEmpty(r[TASK_COL.ID]) && nonEmpty(r[TASK_COL.TITLE]))
 		.map((r) => ({
-			id: String(r[TASK_COL.ID]),
+			id: toText(r[TASK_COL.ID]),
 			status: normalizeStatus(r[TASK_COL.STATUS]),
-			category: String(r[TASK_COL.CATEGORY] ?? ""),
-			title: String(r[TASK_COL.TITLE] ?? ""),
+			category: toText(r[TASK_COL.CATEGORY]),
+			title: toText(r[TASK_COL.TITLE]),
 			submitReward: toNumber(r[TASK_COL.SUBMIT_REWARD]),
 			completeReward: toNumber(r[TASK_COL.COMPLETE_REWARD]),
 			points: toNumber(r[TASK_COL.COMPLETE_REWARD]), // back-compat: legacy `points`
@@ -336,7 +354,7 @@ function shapeHistory(rows: unknown[][]) {
 		)
 		.map((r) => ({
 			date: toDateTimeString(r[HISTORY_COL.DATE]),
-			content: String(r[HISTORY_COL.CONTENT] ?? ""),
+			content: toText(r[HISTORY_COL.CONTENT]),
 			points: toNumber(r[HISTORY_COL.POINTS]),
 		}));
 }

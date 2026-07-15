@@ -14,6 +14,7 @@
 import { ACTIONS, type ActionRequest } from "./actions";
 import type { Env } from "./env";
 import { HttpError, constantTimeEqual, isValidUser } from "./util";
+import { validateActionRequest } from "../shared/contracts-runtime";
 
 export type { Env };
 const INVITE_CODE_PATTERN = /^[A-Z0-9]{6}$/;
@@ -21,6 +22,9 @@ const INVITE_CODE_PATTERN = /^[A-Z0-9]{6}$/;
 // inputs; format is otherwise unconstrained.
 const API_TOKEN_MIN_LENGTH = 16;
 const API_TOKEN_MAX_LENGTH = 128;
+type GuardResult = { ok: true } | { ok: false; response: Response };
+type DefResult = { ok: true; value: (typeof ACTIONS)[Exclude<SharedActionName, "redeemInvite">] } | { ok: false; response: Response };
+type JsonParseResult = { ok: true; value: unknown } | { ok: false; response: Response };
 
 export default {
 	async fetch(req: Request, env: Env): Promise<Response> {
@@ -37,55 +41,100 @@ export default {
 			// Anything else is a static asset (SPA shell, JS, CSS, icons, etc.).
 			return env.ASSETS.fetch(req);
 		} catch (e: unknown) {
-			if (e instanceof HttpError) {
-				return json({ ok: false, error: e.message }, e.status);
-			}
-			const err = e as Error;
-			console.error("Unhandled error:", err.stack ?? err.message);
-			return json({ ok: false, error: err.message }, 500);
+			return toErrorResponse(e);
 		}
 	},
 } satisfies ExportedHandler<Env>;
 
 async function dispatch(req: Request, env: Env): Promise<Response> {
-	let body: ActionRequest;
-	try {
-		const text = await req.text();
-		body = JSON.parse(text);
-	} catch {
-		return json({ ok: false, error: "Invalid JSON body" }, 400);
+	const bodyRaw = await readRequestJson(req);
+	if (!bodyRaw.ok) return bodyRaw.response;
+	const validated = validateActionRequest(bodyRaw.value);
+	if (!validated.ok) {
+		return jsonError(validated.error, 400);
 	}
+	const body = validated.value as ActionRequest;
 	// `redeemInvite` is the only action that runs without API_TOKEN. Everything
 	// else requires Authorization: Bearer <API_TOKEN>.
 	if (body.action === "redeemInvite") {
-		const code = typeof body.code === "string" ? body.code : "";
-		if (!isValidInviteCode(code)) {
-			return json({ ok: false, error: "Invalid invite code" }, 400);
-		}
-		const expected = env.INVITE_CODE ?? "";
-		if (!isValidInviteCode(expected) || !constantTimeEqual(code, expected)) {
-			return json({ ok: false, error: "Invalid invite code" }, 401);
-		}
-		const apiToken = env.API_TOKEN ?? "";
-		if (!isValidApiToken(apiToken)) {
-			return json({ ok: false, error: "Server misconfigured" }, 500);
-		}
-		return json({ ok: true, apiToken });
+		return redeemInvite(body, env);
 	}
-
-	const def = body.action ? ACTIONS[body.action] : undefined;
-	if (!def) {
-		return json({ ok: false, error: `Unsupported action: ${body.action}` }, 400);
-	}
-	if (!authorized(req, env)) {
-		return json({ ok: false, error: "Unauthorized" }, 401);
-	}
-	if (def.requireUser && !isValidUser(body.user)) {
-		return json({ ok: false, error: `Invalid user: ${body.user}` }, 400);
-	}
-
-	const result = await def.handler(body, env);
+	const def = getActionDef(body);
+	if (!def.ok) return def.response;
+	const guard = guardAuthorizedRequest(req, env, body, def.value.requireUser);
+	if (!guard.ok) return guard.response;
+	const result = await def.value.handler(body, env);
 	return json({ ok: true, ...(result as object) });
+}
+
+function jsonError(message: string, status: number): Response {
+	return json({ ok: false, error: message }, status);
+}
+
+function toErrorResponse(error: unknown): Response {
+	if (error instanceof HttpError) {
+		return jsonError(error.message, error.status);
+	}
+	const err = error as Error;
+	console.error("Unhandled error:", err.stack ?? err.message);
+	return jsonError(err.message, 500);
+}
+
+function getActionDef(body: ActionRequest): DefResult {
+	const action = body.action;
+	if (action === "redeemInvite") {
+		return { ok: false, response: jsonError("Unsupported action: redeemInvite", 400) };
+	}
+	const def = action ? ACTIONS[action] : undefined;
+	if (!def) {
+		return { ok: false, response: jsonError(`Unsupported action: ${body.action}`, 400) };
+	}
+	return { ok: true, value: def };
+}
+
+function guardAuthorizedRequest(
+	req: Request,
+	env: Env,
+	body: ActionRequest,
+	requireUser: boolean,
+): GuardResult {
+	if (!authorized(req, env)) {
+		return { ok: false, response: jsonError("Unauthorized", 401) };
+	}
+	if (requireUser && !isValidUser(body.user)) {
+		return { ok: false, response: jsonError(`Invalid user: ${body.user}`, 400) };
+	}
+	return { ok: true };
+}
+
+async function readRequestJson(req: Request): Promise<JsonParseResult> {
+	try {
+		const text = await req.text();
+		return { ok: true, value: JSON.parse(text) };
+	} catch {
+		return { ok: false, response: jsonError("Invalid JSON body", 400) };
+	}
+}
+
+function redeemInvite(body: ActionRequest, env: Env): Response {
+	const code = typeof body.code === "string" ? body.code : "";
+	if (!isValidInviteCode(code)) {
+		return jsonError("Invalid invite code", 400);
+	}
+	const expected = env.INVITE_CODE ?? "";
+	if (!isMatchingInviteCode(code, expected)) {
+		return jsonError("Invalid invite code", 401);
+	}
+	const apiToken = env.API_TOKEN ?? "";
+	if (!isValidApiToken(apiToken)) {
+		return jsonError("Server misconfigured", 500);
+	}
+	return json({ ok: true, apiToken });
+}
+
+function isMatchingInviteCode(code: string, expected: string): boolean {
+	if (!isValidInviteCode(expected)) return false;
+	return constantTimeEqual(code, expected);
 }
 
 // Gate /api with the long-lived API_TOKEN secret. The SPA obtains it once via
@@ -95,11 +144,17 @@ async function dispatch(req: Request, env: Env): Promise<Response> {
 function authorized(req: Request, env: Env): boolean {
 	const expected = env.API_TOKEN ?? "";
 	if (!isValidApiToken(expected)) return false;
-	const header = req.headers.get("Authorization") ?? "";
-	const m = /^Bearer\s+(.+)$/i.exec(header);
-	if (!m) return false;
-	if (!isValidApiToken(m[1])) return false;
-	return constantTimeEqual(m[1], expected);
+	const provided = extractBearerToken(req.headers.get("Authorization") ?? "");
+	if (!provided || !isValidApiToken(provided)) return false;
+	return constantTimeEqual(provided, expected);
+}
+
+function extractBearerToken(headerValue = ""): string {
+	const header = headerValue;
+	const prefix = "bearer ";
+	const lower = header.toLowerCase();
+	if (!lower.startsWith(prefix)) return "";
+	return header.slice(prefix.length).trim();
 }
 
 function isValidInviteCode(value: string): boolean {

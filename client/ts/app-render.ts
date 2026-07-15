@@ -1,7 +1,90 @@
 (function () {
   'use strict';
 
-  function create(deps: any) {
+  function sumHistoryPoints(history: LPHistoryItem[]): number {
+    return history.reduce(function (sum, h) { return sum + (Number(h.points) || 0); }, 0);
+  }
+
+  function statusClassOf(task: LPTask, status: ReturnType<LPRendererDeps['getStatus']>): string {
+    if (task.status === status.SUBMITTED) return 'status-applied';
+    if (task.status === status.APPROVED) return 'status-approved';
+    if (task.status === status.RETURNED) return 'status-returned';
+    return 'status-pending';
+  }
+
+  function expiryLabelOf(
+    task: LPTask,
+    tr: LPTranslator,
+    formatDate: LPRendererDeps['formatDate'],
+    isExpired: LPRendererDeps['isExpired']
+  ): string {
+    if (!task.expiry) return '';
+    const expired = isExpired(task.expiry);
+    return tr('tasks.expiryLabel', { date: formatDate(task.expiry) }) + (expired ? ' ⚠️' : '');
+  }
+
+  function taskActionHtmlOf(
+    task: LPTask,
+    state: Pick<LPAppState, 'parentMode'>,
+    status: ReturnType<LPRendererDeps['getStatus']>,
+    tr: LPTranslator,
+    escapeHtml: LPRendererDeps['escapeHtml'],
+    expired: boolean
+  ): string {
+    if (state.parentMode && task.status === status.SUBMITTED) {
+      return '\n        <div class="task-action-group">\n' +
+        '          <button class="task-btn approve-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="approve">' + escapeHtml(tr('tasks.approve')) + '</button>\n' +
+        '          <button class="task-btn reject-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="reject">' + escapeHtml(tr('tasks.reject')) + '</button>\n' +
+        '        </div>\n      ';
+    }
+    if (state.parentMode && (task.status === status.PENDING || task.status === status.RETURNED)) return '';
+    if (task.status === status.PENDING) {
+      return '<button class="task-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="apply" ' + (expired ? 'disabled' : '') + '>' + escapeHtml(tr('tasks.apply')) + '</button>';
+    }
+    if (task.status === status.RETURNED) {
+      return '<button class="task-btn resubmit-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="apply" ' + (expired ? 'disabled' : '') + '>' + escapeHtml(tr('tasks.resubmit')) + '</button>';
+    }
+    if (task.status === status.SUBMITTED) {
+      return '<button class="task-btn withdraw-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="withdraw" aria-label="' + escapeHtml(tr('tasks.withdraw')) + '">' + escapeHtml(tr('tasks.appliedBadge')) + '</button>';
+    }
+    if (task.status === status.APPROVED) {
+      return '<span class="task-status-badge">' + escapeHtml(tr('tasks.approvedBadge')) + '</span>';
+    }
+    return '';
+  }
+
+  function pendingCountOf(items: LPTask[], status: ReturnType<LPRendererDeps['getStatus']>): number {
+    return items.filter(function (t) { return t.status === status.SUBMITTED; }).length;
+  }
+
+  function totalMinutesOf(items: LPTask[], status: ReturnType<LPRendererDeps['getStatus']>): number {
+    return items
+      .filter(function (t) { return t.status !== status.APPROVED && t.status !== status.SUBMITTED; })
+      .reduce(function (sum, t) { return sum + (Number(t.minutes) || 0); }, 0);
+  }
+
+  function taskGroupHtml(
+    key: string,
+    items: LPTask[],
+    status: ReturnType<LPRendererDeps['getStatus']>,
+    tr: LPTranslator,
+    escapeHtml: LPRendererDeps['escapeHtml'],
+    formatMinutes: LPRendererDeps['formatMinutes'],
+    taskItemHtml: (task: LPTask) => string
+  ): string {
+    const pendingCount = pendingCountOf(items, status);
+    const pendingBadge = pendingCount > 0 ? '<span class="task-group-badge">' + escapeHtml(tr('tasks.pendingCount', { n: pendingCount })) + '</span>' : '';
+    const totalMinutes = totalMinutesOf(items, status);
+    const timeBadge = totalMinutes > 0 ? '<span class="task-group-time">⏱ ' + escapeHtml(formatMinutes(totalMinutes)) + '</span>' : '';
+    return '\n        <div class="task-group">\n' +
+      '          <h3 class="task-group-title">' + escapeHtml(key) + timeBadge + pendingBadge + '</h3>\n' +
+      '          <div class="task-group-items">\n' +
+      '            ' + items.map(taskItemHtml).join('') + '\n' +
+      '          </div>\n' +
+      '        </div>\n      ';
+  }
+
+  function create(deps: LPRendererDeps): LPRendererApi {
     const state = deps.state;
     const els = deps.els;
     const tr = deps.tr;
@@ -12,11 +95,7 @@
     const isExpired = deps.isExpired;
     const onTaskAction = deps.onTaskAction;
 
-    function sumHistoryPoints(history: any[]): number {
-      return history.reduce(function (sum, h) { return sum + (Number(h.points) || 0); }, 0);
-    }
-
-    function formatRewards(task: any) {
+    function formatRewards(task: LPTask) {
       const sub = Number(task.submitReward) || 0;
       const com = Number(task.completeReward) || Number(task.points) || 0;
       const showSub = sub > 0;
@@ -39,35 +118,12 @@
       return '';
     }
 
-    function taskItemHtml(task: any) {
+    function taskItemHtml(task: LPTask) {
       const status = getStatus();
-      const statusClass =
-        task.status === status.SUBMITTED ? 'status-applied' :
-        task.status === status.APPROVED ? 'status-approved' :
-        task.status === status.RETURNED ? 'status-returned' : 'status-pending';
-
+      const statusClass = statusClassOf(task, status);
       const expired = isExpired(task.expiry);
-      const expiryLabel = task.expiry
-        ? tr('tasks.expiryLabel', { date: formatDate(task.expiry) }) + (expired ? ' ⚠️' : '')
-        : '';
-
-      let actionHtml = '';
-      if (state.parentMode && task.status === status.SUBMITTED) {
-        actionHtml = '\n        <div class="task-action-group">\n' +
-          '          <button class="task-btn approve-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="approve">' + escapeHtml(tr('tasks.approve')) + '</button>\n' +
-          '          <button class="task-btn reject-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="reject">' + escapeHtml(tr('tasks.reject')) + '</button>\n' +
-          '        </div>\n      ';
-      } else if (state.parentMode && (task.status === status.PENDING || task.status === status.RETURNED)) {
-        actionHtml = '';
-      } else if (task.status === status.PENDING) {
-        actionHtml = '<button class="task-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="apply" ' + (expired ? 'disabled' : '') + '>' + escapeHtml(tr('tasks.apply')) + '</button>';
-      } else if (task.status === status.RETURNED) {
-        actionHtml = '<button class="task-btn resubmit-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="apply" ' + (expired ? 'disabled' : '') + '>' + escapeHtml(tr('tasks.resubmit')) + '</button>';
-      } else if (task.status === status.SUBMITTED) {
-        actionHtml = '<button class="task-btn withdraw-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="withdraw" aria-label="' + escapeHtml(tr('tasks.withdraw')) + '">' + escapeHtml(tr('tasks.appliedBadge')) + '</button>';
-      } else if (task.status === status.APPROVED) {
-        actionHtml = '<span class="task-status-badge">' + escapeHtml(tr('tasks.approvedBadge')) + '</span>';
-      }
+      const expiryLabel = expiryLabelOf(task, tr, formatDate, isExpired);
+      const actionHtml = taskActionHtmlOf(task, state, status, tr, escapeHtml, expired);
 
       return '\n      <div class="task-item ' + statusClass + '">\n' +
         '        <div class="task-info">\n' +
@@ -87,8 +143,8 @@
       const tab = state.activeTab;
       els.tabTasks.classList.toggle('is-active', tab === 'tasks');
       els.tabHistory.classList.toggle('is-active', tab === 'history');
-      els.tabTasks.setAttribute('aria-selected', tab === 'tasks');
-      els.tabHistory.setAttribute('aria-selected', tab === 'history');
+      els.tabTasks.setAttribute('aria-selected', tab === 'tasks' ? 'true' : 'false');
+      els.tabHistory.setAttribute('aria-selected', tab === 'history' ? 'true' : 'false');
       els.panelTasks.classList.toggle('hidden', tab !== 'tasks');
       els.panelHistory.classList.toggle('hidden', tab !== 'history');
 
@@ -119,28 +175,18 @@
         return;
       }
 
-      const groups = new Map();
+      const groups = new Map<string, LPTask[]>();
       visible.forEach(function (t) {
         const key = t.category || tr('tasks.otherGroup');
         if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(t);
+        const bucket = groups.get(key);
+        if (bucket) bucket.push(t);
       });
 
       const sortedKeys = Array.from(groups.keys());
       els.tasksList.innerHTML = sortedKeys.map(function (key) {
-        const items = groups.get(key);
-        const pendingCount = items.filter(function (t) { return t.status === status.SUBMITTED; }).length;
-        const pendingBadge = pendingCount > 0 ? '<span class="task-group-badge">' + escapeHtml(tr('tasks.pendingCount', { n: pendingCount })) + '</span>' : '';
-        const totalMinutes = items
-          .filter(function (t) { return t.status !== status.APPROVED && t.status !== status.SUBMITTED; })
-          .reduce(function (sum, t) { return sum + (Number(t.minutes) || 0); }, 0);
-        const timeBadge = totalMinutes > 0 ? '<span class="task-group-time">⏱ ' + escapeHtml(formatMinutes(totalMinutes)) + '</span>' : '';
-        return '\n        <div class="task-group">\n' +
-          '          <h3 class="task-group-title">' + escapeHtml(key) + timeBadge + pendingBadge + '</h3>\n' +
-          '          <div class="task-group-items">\n' +
-          '            ' + items.map(taskItemHtml).join('') + '\n' +
-          '          </div>\n' +
-          '        </div>\n      ';
+        const items = groups.get(key) || [];
+        return taskGroupHtml(key, items, status, tr, escapeHtml, formatMinutes, taskItemHtml);
       }).join('');
 
       els.tasksList.querySelectorAll('[data-task-id]').forEach(function (btn) {
@@ -212,5 +258,5 @@
     };
   }
 
-  (window as any).LESSERPAY_RENDER = { create: create };
+  window.LESSERPAY_RENDER = { create: create };
 })();

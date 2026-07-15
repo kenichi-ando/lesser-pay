@@ -37,7 +37,7 @@ let usersCache: { raw: string; parsed: User[] } | null = null;
 
 function parseUsers(raw: string): User[] {
 	if (!raw) return [];
-	if (usersCache && usersCache.raw === raw) return usersCache.parsed;
+	if (usersCache?.raw === raw) return usersCache.parsed;
 
 	const parsed: User[] = [];
 	for (const entry of raw.split(",")) {

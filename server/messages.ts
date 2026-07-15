@@ -37,7 +37,25 @@ export const MSG = {
 	notifyCashoutBody: "{user} が {amount} pt を使いました。\n残高: {balance} pt",
 } as const;
 
+function consumeMessageError(_error: unknown): void {
+	if (_error === undefined) return;
+}
+
+function toMessageText(value: unknown): string {
+	if (value == null) return "";
+	if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+	if (typeof value === "bigint" || typeof value === "symbol") return String(value);
+	if (value instanceof Date) return String(value);
+	try {
+		const json = JSON.stringify(value);
+		return json ?? "";
+	} catch (err) {
+		consumeMessageError(err);
+		return "";
+	}
+}
+
 // Render a template like "{name} さん" with the given vars.
 export function fmt(tpl: string, vars: Record<string, unknown>): string {
-	return tpl.replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? String(vars[k]) : ""));
+	return tpl.replace(/\{(\w+)\}/g, (_, k) => toMessageText(vars[k]));
 }

@@ -22,9 +22,27 @@ export const STATUS = {
 	APPROVED: "Approved",
 } as const;
 
+function consumeSchemaError(_error: unknown): void {
+	if (_error === undefined) return;
+}
+
+function toText(value: unknown): string {
+	if (value == null) return "";
+	if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+	if (typeof value === "bigint" || typeof value === "symbol") return String(value);
+	if (value instanceof Date) return String(value);
+	try {
+		const json = JSON.stringify(value);
+		return json ?? "";
+	} catch (err) {
+		consumeSchemaError(err);
+		return "";
+	}
+}
+
 // Read a raw STATUS cell value. Blank → PENDING.
 export function normalizeStatus(raw: unknown): string {
-	const s = String(raw ?? "");
+	const s = toText(raw);
 	return s || STATUS.PENDING;
 }
 
@@ -74,7 +92,7 @@ export function colLetter(col: number): string {
 	let n = col;
 	while (n > 0) {
 		const r = (n - 1) % 26;
-		s = String.fromCharCode(65 + r) + s;
+		s = String.fromCodePoint(65 + r) + s;
 		n = Math.floor((n - 1) / 26);
 	}
 	return s;
