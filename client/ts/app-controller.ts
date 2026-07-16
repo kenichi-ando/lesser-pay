@@ -1,5 +1,110 @@
+/// <reference path="./global.d.ts" />
 (function () {
   'use strict';
+
+  function buildUserPopoverChildItemsHtml(
+    serverUsers: LPUser[],
+    parentMode: boolean,
+    currentUser: string | null,
+    escapeHtml: (value: unknown) => string
+  ): string {
+    if (!parentMode) return '';
+    return serverUsers.map(function (user) {
+      const key = user.key;
+      const label = user.label;
+      const isCurrent = key === currentUser;
+      return '\n<li class="user-popover-item ' + (isCurrent ? 'is-current' : '') + '">\n' +
+        '  <button class="user-popover-pick" type="button" data-user="' + escapeHtml(key) + '">\n' +
+        '    <span class="user-popover-mark">' + (isCurrent ? '✓' : '') + '</span>\n' +
+        '    <span class="user-popover-name">' + escapeHtml(label) + '</span>\n' +
+        '  </button>\n' +
+        '</li>\n';
+    }).join('');
+  }
+
+  function buildUserPopoverHtml(options: {
+    serverUsers: LPUser[];
+    parentMode: boolean;
+    currentUser: string | null;
+    tr: LPTranslator;
+    escapeHtml: (value: unknown) => string;
+  }): string {
+    const childItems = buildUserPopoverChildItemsHtml(
+      options.serverUsers,
+      options.parentMode,
+      options.currentUser,
+      options.escapeHtml
+    );
+    const header = options.parentMode
+      ? '<li class="user-popover-group-title">' + options.escapeHtml(options.tr('users.childSwitchTitle')) + '</li>'
+      : '';
+    const divider = options.parentMode ? '<li class="user-popover-divider" aria-hidden="true"></li>' : '';
+    return header + childItems + divider +
+      '<li class="user-popover-item">' +
+      '  <button class="user-popover-pick user-popover-login-switch" type="button" data-action="switch-login-user">' +
+      '    <span class="user-popover-name">👤 ' + options.escapeHtml(options.tr('users.loginSwitch')) + '</span>' +
+      '  </button>' +
+      '</li>' +
+      '<li class="user-popover-item">' +
+      '  <button class="user-popover-pick user-popover-settings" type="button" data-action="open-settings">' +
+      '    <span class="user-popover-name">⚙️ ' + options.escapeHtml(options.tr('settings.open')) + '</span>' +
+      '  </button>' +
+      '</li>';
+  }
+
+  function buildUserSelectionHtml(options: {
+    serverUsers: LPUser[];
+    currentSelection: string | null;
+    tr: LPTranslator;
+    escapeHtml: (value: unknown) => string;
+  }): string {
+    const users = options.serverUsers.map(function (user) {
+      const key = user.key;
+      const label = user.label;
+      const currentClass = key === options.currentSelection ? ' is-current' : '';
+      return '<button class="user-select-btn' + currentClass + '" type="button" data-user-select="' + options.escapeHtml(key) + '">' +
+        '<span class="user-select-icon" aria-hidden="true">🐾</span>' +
+        '<span>' + options.escapeHtml(label) + '</span></button>';
+    }).join('');
+    const parentCurrentClass = options.currentSelection === '__parent__' ? ' is-current' : '';
+    const parentBtn = '<button class="user-select-btn is-parent' + parentCurrentClass + '" type="button" data-user-select="__parent__">' +
+      '<span class="user-select-key" aria-hidden="true">🔑</span>' +
+      '<span>' + options.escapeHtml(options.tr('userSelect.parent')) + '</span></button>';
+    return users + parentBtn;
+  }
+
+  type LoginUserSelectionOptions = {
+    closable: boolean;
+    keepSession: boolean;
+    returnState: LPAppState['selectionReturnState'];
+  };
+
+  function makeLoginUserSelectionOptions(state: Pick<LPAppState, 'user' | 'parentMode' | 'parentPin'>): LoginUserSelectionOptions {
+    const canClose = !!state.user;
+    return {
+      closable: canClose,
+      keepSession: canClose,
+      returnState: canClose ? {
+        user: state.user,
+        parentMode: state.parentMode,
+        parentPin: state.parentPin
+      } : null
+    };
+  }
+
+  function shouldKeepParentMode(options: { keepParentMode?: boolean }, state: Pick<LPAppState, 'parentMode' | 'parentPin'>): boolean {
+    return !!options.keepParentMode && state.parentMode && !!state.parentPin;
+  }
+
+  function getCurrentSelection(state: Pick<LPAppState, 'parentMode' | 'user'>): string | null {
+    return state.parentMode ? '__parent__' : state.user;
+  }
+
+  function canSwitchUser(key: string, sameUser: boolean, forceExitParentMode: boolean, state: Pick<LPAppState, 'parentMode'>): boolean {
+    if (!key) return false;
+    if (!sameUser) return true;
+    return forceExitParentMode && state.parentMode;
+  }
 
   function create(deps: LPControllerDeps): LPControllerApi {
     const store = deps.store;
@@ -55,40 +160,6 @@
       }
     }
 
-    function buildUserPopoverChildItems(): string {
-      if (!state.parentMode) return '';
-      return state.serverUsers.map(function (_ref) {
-        const key = _ref.key;
-        const label = _ref.label;
-        const isCurrent = key === state.user;
-        return '\n<li class="user-popover-item ' + (isCurrent ? 'is-current' : '') + '">\n' +
-          '  <button class="user-popover-pick" type="button" data-user="' + escapeHtml(key) + '">\n' +
-          '    <span class="user-popover-mark">' + (isCurrent ? '✓' : '') + '</span>\n' +
-          '    <span class="user-popover-name">' + escapeHtml(label) + '</span>\n' +
-          '  </button>\n' +
-          '</li>\n';
-      }).join('');
-    }
-
-    function buildUserPopoverHtml(): string {
-      const childItems = buildUserPopoverChildItems();
-      const header = state.parentMode
-        ? '<li class="user-popover-group-title">' + escapeHtml(tr('users.childSwitchTitle')) + '</li>'
-        : '';
-      const divider = state.parentMode ? '<li class="user-popover-divider" aria-hidden="true"></li>' : '';
-      return header + childItems + divider +
-        '<li class="user-popover-item">' +
-        '  <button class="user-popover-pick user-popover-login-switch" type="button" data-action="switch-login-user">' +
-        '    <span class="user-popover-name">👤 ' + escapeHtml(tr('users.loginSwitch')) + '</span>' +
-        '  </button>' +
-        '</li>' +
-        '<li class="user-popover-item">' +
-        '  <button class="user-popover-pick user-popover-settings" type="button" data-action="open-settings">' +
-        '    <span class="user-popover-name">⚙️ ' + escapeHtml(tr('settings.open')) + '</span>' +
-        '  </button>' +
-        '</li>';
-    }
-
     function bindUserPopoverHandlers() {
       els.userPopoverList.querySelectorAll('[data-user]').forEach(function (btn) {
         btn.addEventListener('click', onPopoverUserPick);
@@ -106,7 +177,13 @@
         els.userPopoverList.innerHTML = '<li class="user-popover-empty">' + escapeHtml(tr('setup.needUsers')) + '</li>';
         return;
       }
-      els.userPopoverList.innerHTML = buildUserPopoverHtml();
+      els.userPopoverList.innerHTML = buildUserPopoverHtml({
+        serverUsers: state.serverUsers,
+        parentMode: state.parentMode,
+        currentUser: state.user,
+        tr: tr,
+        escapeHtml: escapeHtml
+      });
       bindUserPopoverHandlers();
     }
 
@@ -145,23 +222,7 @@
       } catch (err) {
         actions.toast(err instanceof Error && err.message ? err.message : tr('errors.network'), 'error');
       }
-      showUserSelection(makeLoginUserSelectionOptions());
-    }
-
-    function buildUserSelectionHtml(currentSelection: string | null): string {
-      const users = state.serverUsers.map(function (_ref2) {
-        const key = _ref2.key;
-        const label = _ref2.label;
-        const currentClass = key === currentSelection ? ' is-current' : '';
-        return '<button class="user-select-btn' + currentClass + '" type="button" data-user-select="' + escapeHtml(key) + '">' +
-          '<span class="user-select-icon" aria-hidden="true">🐾</span>' +
-          '<span>' + escapeHtml(label) + '</span></button>';
-      }).join('');
-      const parentCurrentClass = currentSelection === '__parent__' ? ' is-current' : '';
-      const parentBtn = '<button class="user-select-btn is-parent' + parentCurrentClass + '" type="button" data-user-select="__parent__">' +
-        '<span class="user-select-key" aria-hidden="true">🔑</span>' +
-        '<span>' + escapeHtml(tr('userSelect.parent')) + '</span></button>';
-      return users + parentBtn;
+      showUserSelection(makeLoginUserSelectionOptions(state));
     }
 
     function bindUserSelectionHandlers() {
@@ -170,29 +231,8 @@
       });
     }
 
-    function getCurrentSelection(): string | null {
-      return state.parentMode ? '__parent__' : state.user;
-    }
-
     function updateUserSelectionCloseButtonVisibility(): void {
       els.userSelectCloseBtn.classList.toggle('hidden', !state.userSelectionClosable);
-    }
-
-    function makeLoginUserSelectionOptions(): {
-      closable: boolean;
-      keepSession: boolean;
-      returnState: LPAppState['selectionReturnState'];
-    } {
-      const canClose = !!state.user;
-      return {
-        closable: canClose,
-        keepSession: canClose,
-        returnState: canClose ? {
-          user: state.user,
-          parentMode: state.parentMode,
-          parentPin: state.parentPin
-        } : null
-      };
     }
 
     function showUserSelection(options: {
@@ -208,8 +248,13 @@
       if (!opts.keepSession) {
         clearParentSession();
       }
-      const currentSelection = getCurrentSelection();
-      els.userSelectList.innerHTML = buildUserSelectionHtml(currentSelection);
+      const currentSelection = getCurrentSelection(state);
+      els.userSelectList.innerHTML = buildUserSelectionHtml({
+        serverUsers: state.serverUsers,
+        currentSelection: currentSelection,
+        tr: tr,
+        escapeHtml: escapeHtml
+      });
       bindUserSelectionHandlers();
       updateUserSelectionCloseButtonVisibility();
       els.userSelectScreen.classList.remove('hidden');
@@ -294,12 +339,12 @@
       const opts = options || {};
       const forceExitParentMode = !!opts.forceExitParentMode;
       const sameUser = key === state.user;
-      if (!canSwitchUser(key, sameUser, forceExitParentMode)) {
+      if (!canSwitchUser(key, sameUser, forceExitParentMode, state)) {
         closeUserPopover();
         return;
       }
       closeUserPopover();
-      const keepParentMode = shouldKeepParentMode(opts);
+      const keepParentMode = shouldKeepParentMode(opts, state);
       if (!sameUser) {
         state.user = key;
         store.setUser(key);
@@ -313,18 +358,6 @@
         actions.toast(tr(opts.toastKey || 'users.switchedToast', { name: labelOf(key) }), 'success');
       }
       await data.loadData(true);
-    }
-
-    function canSwitchUser(key: string, sameUser: boolean, forceExitParentMode: boolean) {
-      if (!key) return false;
-      if (!sameUser) return true;
-      return forceExitParentMode && state.parentMode;
-    }
-
-    function shouldKeepParentMode(options: {
-      keepParentMode?: boolean;
-    }) {
-      return !!options.keepParentMode && state.parentMode && !!state.parentPin;
     }
 
     function clearParentError() {

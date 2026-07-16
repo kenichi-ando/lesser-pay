@@ -1,3 +1,4 @@
+/// <reference path="./global.d.ts" />
 // LesserPay UI string resources.
 //
 // All user-facing strings live here. Use `tr('foo.bar')` from app.js,

@@ -1,3 +1,4 @@
+/// <reference path="./global.d.ts" />
 // LesserPay configuration (no personal data here).
 interface StorageKeys {
   user: string;

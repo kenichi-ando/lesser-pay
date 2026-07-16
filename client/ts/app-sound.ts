@@ -1,4 +1,5 @@
 /* eslint-disable no-undef */
+/// <reference path="./global.d.ts" />
 // Tiny WebAudio sound effects. No audio files — everything is synthesized so
 // the PWA stays fully self-contained and the latency is zero.
 //
