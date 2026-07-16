@@ -135,7 +135,7 @@
       state.parentPin = pin;
       state.parentMode = true;
       if (persistPin) store.setParentPin(pin);
-      store.setParentMode(true);
+      store.enableParentMode();
     }
 
     function resetUserDataView() {

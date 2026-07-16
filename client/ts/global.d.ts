@@ -61,7 +61,8 @@ interface LPStoreApi {
   setParentPin: (pin: string) => void;
   clearParentPin: () => void;
   getParentMode: () => boolean;
-  setParentMode: (enabled: boolean) => void;
+  enableParentMode: () => void;
+  disableParentMode: () => void;
   clearParentMode: () => void;
   getApiToken: () => string | null;
   setApiToken: (token: string) => void;

@@ -12,10 +12,8 @@
       setParentPin: function (pin) { localStorage.setItem(sk.parentPin, pin); },
       clearParentPin: function () { localStorage.removeItem(sk.parentPin); },
       getParentMode: function () { return localStorage.getItem(sk.parentMode) === '1'; },
-      setParentMode: function (enabled) {
-        if (enabled) localStorage.setItem(sk.parentMode, '1');
-        else localStorage.removeItem(sk.parentMode);
-      },
+      enableParentMode: function () { localStorage.setItem(sk.parentMode, '1'); },
+      disableParentMode: function () { localStorage.removeItem(sk.parentMode); },
       clearParentMode: function () { localStorage.removeItem(sk.parentMode); },
       getApiToken: function () { return localStorage.getItem(sk.apiToken); },
       setApiToken: function (token) { localStorage.setItem(sk.apiToken, token); },

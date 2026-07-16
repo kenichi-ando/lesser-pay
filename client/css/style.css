@@ -992,8 +992,8 @@ body {
 
 .balance-bonus {
   background: linear-gradient(135deg, #f7a4c9 0%, #d56ea1 100%);
-  color: #fffaf0;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  color: #3a1f2f;
+  text-shadow: none;
 }
 
 .balance-cashout {
