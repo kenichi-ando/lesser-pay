@@ -14,7 +14,9 @@ import { handleSubscribePush, handleUnsubscribePush } from "./actions-push";
 import {
 	handleApplyTask,
 	handleApproveTask,
+	handleCreateTask,
 	handleRejectTask,
+	handleUpdateTask,
 	handleWithdrawTask,
 } from "./actions-tasks";
 import { handleCashout, handleGrantBonus } from "./actions-finance";
@@ -63,6 +65,21 @@ export const ACTIONS: Record<ServerActionName, ActionDef> = {
 	rejectTask: userAction((req, env) =>
 		handleRejectTask(env, asUser(req), asTaskId(req), req.pin)),
 	withdrawTask: userAction((req, env) => handleWithdrawTask(env, asUser(req), asTaskId(req))),
+	createTask: userAction((req, env) =>
+		handleCreateTask(env, asUser(req), {
+			category: req.category,
+			title: req.title,
+			completeReward: req.completeReward,
+			role: req.role,
+			pin: req.pin,
+		})),
+	updateTask: userAction((req, env) =>
+		handleUpdateTask(env, asUser(req), asTaskId(req), {
+			category: req.category,
+			title: req.title,
+			completeReward: req.completeReward,
+			pin: req.pin,
+		})),
 	cashout: userAction((req, env) => handleCashout(env, asUser(req), req.amount, req.pin)),
 	grantBonus: userAction((req, env) =>
 		handleGrantBonus(env, asUser(req), req.label, req.amount, req.pin)),

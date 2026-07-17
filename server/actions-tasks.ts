@@ -3,14 +3,19 @@ import { SHEET_PREFIX, STATUS, TASK_COL, HISTORY_LABEL, normalizeStatus } from "
 import { MSG, fmt } from "./messages";
 import {
   appendHistoryRow,
+  appendTaskRow,
   casTaskStatus,
   findTaskRow,
   getAccessToken,
   readHistoryRows,
+  updateTaskRow,
 } from "./api";
 import { DEBUG_USER_KEY, checkPin, fetchConfig, labelFor } from "./config";
 import { notify } from "./notify";
-import { HttpError, formatDateTime, isExpired, toNumber } from "./util";
+import { HttpError, formatDateTime, generateTaskId, isExpired, toNumber } from "./util";
+
+const TASK_TITLE_MAX_LEN = 80;
+const TASK_CATEGORY_MAX_LEN = 40;
 
 function toTextCell(value: unknown): string {
   if (typeof value === "string") return value;
@@ -88,6 +93,39 @@ function buildApplyNotifyBody(
   return lines.join("\n");
 }
 
+async function notifyRequest(env: Env, user: string, displayName: string, taskLabel: string, pt: number) {
+  const subject = fmt(MSG.notifySubjectRequest, { user: displayName });
+  const body = fmt(MSG.notifyRequestBody, { user: displayName, label: taskLabel, pt });
+  if (user !== DEBUG_USER_KEY) {
+    await notify(env, subject, body, "parent");
+    return;
+  }
+  const debugEndpoint = String(env.DEBUG_ENDPOINT ?? "").trim();
+  if (!debugEndpoint) return;
+  await notify(env, `[DEBUG] ${subject}`, body, "parent", undefined, debugEndpoint);
+}
+
+function parseTaskInput(input: {
+  category: unknown;
+  title: unknown;
+  completeReward: unknown;
+}): { category: string; title: string; completeReward: number } {
+  const category = toTextCell(input.category).trim();
+  const title = toTextCell(input.title).trim();
+  if (!title) throw new HttpError(400, MSG.errTaskTitleMissing);
+  if (title.length > TASK_TITLE_MAX_LEN) {
+    throw new HttpError(400, fmt(MSG.errTaskTitleTooLong, { max: TASK_TITLE_MAX_LEN }));
+  }
+  if (category.length > TASK_CATEGORY_MAX_LEN) {
+    throw new HttpError(400, fmt(MSG.errTaskCategoryTooLong, { max: TASK_CATEGORY_MAX_LEN }));
+  }
+  const completeReward = Number(input.completeReward);
+  if (!Number.isFinite(completeReward) || completeReward <= 0) {
+    throw new HttpError(400, MSG.errInvalidAmount);
+  }
+  return { category, title, completeReward };
+}
+
 export async function handleApplyTask(env: Env, user: string, taskId: string) {
   if (!taskId) throw new HttpError(400, MSG.errTaskIdMissing);
 
@@ -140,6 +178,18 @@ export async function handleApproveTask(env: Env, user: string, taskId: string, 
 
   const currentStatus = normalizeStatus(row[TASK_COL.STATUS]);
   if (currentStatus === STATUS.APPROVED) throw new HttpError(409, MSG.errAlreadyApproved);
+  if (currentStatus === STATUS.REQUESTED) {
+    await casTaskStatus(env, token, tasksSheet, rowIndex, currentStatus, STATUS.PENDING);
+    const displayName = resolveDisplayName(env, user);
+    const taskLabel = taskLabelFromRow(row);
+    await notifyChild(
+      env,
+      user,
+      fmt(MSG.notifySubjectApprove, { user: displayName }),
+      fmt(MSG.notifyRequestApprovedBody, { user: displayName, label: taskLabel }),
+    );
+    return { taskId, status: STATUS.PENDING };
+  }
   if (currentStatus !== STATUS.SUBMITTED) {
     throw new HttpError(409, fmt(MSG.errNotAppliedTask, { status: currentStatus }));
   }
@@ -225,5 +275,80 @@ export async function handleWithdrawTask(env: Env, user: string, taskId: string)
     taskId,
     status: STATUS.PENDING,
     history: { date: historyDate, content: historyContent, points: historyPoints },
+  };
+}
+
+export async function handleCreateTask(
+  env: Env,
+  user: string,
+  input: { category: unknown; title: unknown; completeReward: unknown; role: unknown; pin: unknown },
+) {
+  const role = input.role === "parent" ? "parent" : "child";
+  if (role === "parent") checkPin(env, input.pin);
+  const parsed = parseTaskInput(input);
+  const status = role === "parent" ? STATUS.PENDING : STATUS.REQUESTED;
+  const task: SharedTask = {
+    id: generateTaskId(),
+    status,
+    category: parsed.category,
+    title: parsed.title,
+    submitReward: 0,
+    completeReward: parsed.completeReward,
+    points: parsed.completeReward,
+    minutes: 0,
+    expiry: "",
+  };
+  const token = await getAccessToken(env);
+  const tasksSheet = taskSheetFor(user);
+  await appendTaskRow(env, token, tasksSheet, [
+    task.id,
+    task.status,
+    task.category,
+    task.title,
+    task.submitReward,
+    task.completeReward,
+    "",
+    task.expiry,
+  ]);
+  if (role === "child") {
+    const displayName = resolveDisplayName(env, user);
+    await notifyRequest(env, user, displayName, composeTaskLabel(task.category, task.title), task.completeReward);
+  }
+  return { task };
+}
+
+export async function handleUpdateTask(
+  env: Env,
+  user: string,
+  taskId: string,
+  input: { category: unknown; title: unknown; completeReward: unknown; pin: unknown },
+) {
+  checkPin(env, input.pin);
+  if (!taskId) throw new HttpError(400, MSG.errTaskIdMissing);
+  const parsed = parseTaskInput(input);
+  const token = await getAccessToken(env);
+  const tasksSheet = taskSheetFor(user);
+  const { row, rowIndex } = await findTaskRow(env, token, tasksSheet, taskId);
+  const currentStatus = normalizeStatus(row[TASK_COL.STATUS]);
+  if (currentStatus === STATUS.APPROVED) throw new HttpError(409, MSG.errAlreadyApproved);
+  await updateTaskRow(env, token, tasksSheet, rowIndex, {
+    [TASK_COL.CATEGORY]: parsed.category,
+    [TASK_COL.TITLE]: parsed.title,
+    [TASK_COL.COMPLETE_REWARD]: parsed.completeReward,
+    [TASK_COL.SUBMIT_REWARD]: 0,
+  });
+  return {
+    taskId,
+    task: {
+      id: toTextCell(row[TASK_COL.ID]),
+      status: currentStatus,
+      category: parsed.category,
+      title: parsed.title,
+      submitReward: 0,
+      completeReward: parsed.completeReward,
+      points: parsed.completeReward,
+      minutes: toNumber(row[TASK_COL.MINUTES]),
+      expiry: toTextCell(row[TASK_COL.EXPIRY]),
+    },
   };
 }

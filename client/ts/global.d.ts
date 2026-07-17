@@ -94,6 +94,7 @@ interface LPElements {
   userSelectCloseBtn: HTMLElement;
   cashoutBtn: HTMLElement;
   bonusBtn: HTMLElement;
+  taskUpsertOpenBtn: HTMLElement;
   tabTasks: HTMLElement;
   tabHistory: HTMLElement;
   tabTasksBadge: HTMLElement;
@@ -119,6 +120,16 @@ interface LPElements {
   bonusSubmit: HTMLElement;
   bonusCancel: HTMLElement;
   bonusError: HTMLElement;
+  taskUpsertModal: HTMLElement;
+  taskUpsertTitle: HTMLElement;
+  taskUpsertDesc: HTMLElement;
+  taskCategorySelect: HTMLSelectElement;
+  taskCategoryCustom: HTMLInputElement;
+  taskTitleInput: HTMLInputElement;
+  taskPointsInput: HTMLInputElement;
+  taskUpsertSubmit: HTMLElement;
+  taskUpsertCancel: HTMLElement;
+  taskUpsertError: HTMLElement;
   settingsModal: HTMLElement;
   settingsClose: HTMLElement | null;
   settingsPushRow: HTMLButtonElement | null;
@@ -158,6 +169,8 @@ interface LPControllerActionsApi {
   submitCashout: () => Promise<void>;
   openBonusModal: () => void;
   submitBonus: () => Promise<void>;
+  openTaskUpsertModal: () => void;
+  submitTaskUpsert: () => Promise<void>;
   celebrateRemoteApprovals: () => void;
 }
 
@@ -190,6 +203,8 @@ interface LPControllerApi {
   submitCashout: () => Promise<void>;
   openBonusModal: () => void;
   submitBonus: () => Promise<void>;
+  openTaskUpsertModal: () => void;
+  submitTaskUpsert: () => Promise<void>;
   loadData: (force: boolean) => Promise<void>;
   bootstrap: () => Promise<void>;
   onTaskAction: (event: Event) => Promise<void>;
@@ -268,16 +283,17 @@ interface Window {
   LESSERPAY_CONTROLLER_DATA: { create: (deps: LPControllerDataDeps) => LPControllerDataApi };
   LESSERPAY_CONTROLLER_ACTIONS: {
     create: (deps: {
-      state: Pick<LPAppState, "parentPin" | "tasks" | "history">;
+      state: Pick<LPAppState, "parentPin" | "tasks" | "history" | "parentMode" | "user">;
       els: Pick<
         LPElements,
-        "toast" | "cashoutAmount" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit"
+        "toast" | "cashoutAmount" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskUpsertSubmit" | "taskUpsertError"
       >;
       tr: LPTranslator;
       withBusy: (target: LPBusyTarget, options: { label: string; labelNode?: HTMLElement }, action: () => Promise<void>) => Promise<void>;
       api: (action: SharedActionName, payload: Record<string, string | number | null>) => Promise<unknown>;
       clearDataCache: () => void;
       loadData: (force: boolean) => Promise<void>;
+      isParentMode: () => boolean;
     }) => LPControllerActionsApi;
   };
   LESSERPAY_CONTROLLER: { create: (deps: LPControllerDeps) => LPControllerApi };

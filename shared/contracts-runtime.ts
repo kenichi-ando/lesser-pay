@@ -36,6 +36,25 @@ function validateUserTask(body: Record<string, unknown>): ValidationErr | null {
   return isString(body.taskId) ? null : missing('taskId');
 }
 
+function validateCreateTask(body: Record<string, unknown>): ValidationErr | null {
+  if (!isString(body.user)) return missing('user');
+  if (!isString(body.category)) return missing('category');
+  if (!isString(body.title)) return missing('title');
+  if (!isNumber(body.completeReward)) return missing('completeReward');
+  if (body.role !== 'parent' && body.role !== 'child') return missing('role');
+  if (body.role === 'parent' && !isString(body.pin)) return missing('pin');
+  return null;
+}
+
+function validateUpdateTask(body: Record<string, unknown>): ValidationErr | null {
+  if (!isString(body.user)) return missing('user');
+  if (!isString(body.taskId)) return missing('taskId');
+  if (!isString(body.category)) return missing('category');
+  if (!isString(body.title)) return missing('title');
+  if (!isNumber(body.completeReward)) return missing('completeReward');
+  return isString(body.pin) ? null : missing('pin');
+}
+
 function validateUserTaskPin(body: Record<string, unknown>): ValidationErr | null {
   const err = validateUserTask(body);
   if (err) return err;
@@ -88,6 +107,8 @@ const validators: Record<SharedActionName, ValidationFn> = {
   approveTask: validateUserTaskPin,
   rejectTask: validateUserTaskPin,
   withdrawTask: validateUserTask,
+  createTask: validateCreateTask,
+  updateTask: validateUpdateTask,
   cashout: validateUserAmountPin,
   grantBonus: validateUserLabelAmountPin,
   subscribePush: validateSubscribePush,

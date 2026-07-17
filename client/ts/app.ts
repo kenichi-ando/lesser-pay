@@ -49,6 +49,7 @@
     userSelectCloseBtn: mustElement('user-select-close-btn'),
     cashoutBtn: mustElement('cashout-btn'),
     bonusBtn: mustElement('bonus-btn'),
+    taskUpsertOpenBtn: mustElement('task-upsert-open-btn'),
     tabTasks: mustElement('tab-tasks'),
     tabHistory: mustElement('tab-history'),
     tabTasksBadge: mustElement('tab-tasks-badge'),
@@ -74,6 +75,16 @@
     bonusSubmit: mustElement('bonus-submit-btn'),
     bonusCancel: mustElement('bonus-cancel-btn'),
     bonusError: mustElement('bonus-error'),
+    taskUpsertModal: mustElement('task-upsert-modal'),
+    taskUpsertTitle: mustElement('task-upsert-title'),
+    taskUpsertDesc: mustElement('task-upsert-desc'),
+    taskCategorySelect: mustElement<HTMLSelectElement>('task-category-select'),
+    taskCategoryCustom: mustElement<HTMLInputElement>('task-category-custom'),
+    taskTitleInput: mustElement<HTMLInputElement>('task-title-input'),
+    taskPointsInput: mustElement<HTMLInputElement>('task-points-input'),
+    taskUpsertSubmit: mustElement('task-upsert-submit-btn'),
+    taskUpsertCancel: mustElement('task-upsert-cancel-btn'),
+    taskUpsertError: mustElement('task-upsert-error'),
     settingsModal: mustElement('settings-modal'),
     settingsClose: document.getElementById('settings-close-btn'),
     settingsPushRow: document.getElementById('settings-push-row') as HTMLButtonElement | null,
@@ -134,6 +145,7 @@
       !els.parentModal.classList.contains('hidden') ||
       !els.cashoutModal.classList.contains('hidden') ||
       !els.bonusModal.classList.contains('hidden') ||
+      !els.taskUpsertModal.classList.contains('hidden') ||
       !els.settingsModal.classList.contains('hidden') ||
       !els.userSelectScreen.classList.contains('hidden')
     );
@@ -145,12 +157,24 @@
   }
 
   function registerModalBackdropCloseHandlers(): void {
-    [els.parentModal, els.cashoutModal, els.bonusModal, els.settingsModal].forEach(function (m) {
+    [els.parentModal, els.cashoutModal, els.bonusModal, els.taskUpsertModal, els.settingsModal].forEach(function (m) {
       m.addEventListener('click', function (e) {
         if (e.target !== m) return;
         if (m === els.parentModal) controller.closeParentModal();
         else hideModal(m);
       });
+    });
+  }
+
+  function registerEscapeCloseHandler(): void {
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (!els.settingsModal.classList.contains('hidden')) { hideModal(els.settingsModal); return; }
+      if (!els.taskUpsertModal.classList.contains('hidden')) { hideModal(els.taskUpsertModal); return; }
+      if (!els.bonusModal.classList.contains('hidden')) { hideModal(els.bonusModal); return; }
+      if (!els.cashoutModal.classList.contains('hidden')) { hideModal(els.cashoutModal); return; }
+      if (!els.parentModal.classList.contains('hidden')) { controller.closeParentModal(); return; }
+      if (!els.userSelectScreen.classList.contains('hidden')) { controller.closeUserSelectionWithoutChanges(); }
     });
   }
 
@@ -188,6 +212,12 @@
     els.bonusCancel.addEventListener('click', function () { hideModal(els.bonusModal); });
   }
 
+  function registerTaskUpsertHandlers(): void {
+    els.taskUpsertOpenBtn.addEventListener('click', controller.openTaskUpsertModal);
+    els.taskUpsertSubmit.addEventListener('click', controller.submitTaskUpsert);
+    els.taskUpsertCancel.addEventListener('click', function () { hideModal(els.taskUpsertModal); });
+  }
+
   function registerSettingsHandlers(): void {
     if (els.settingsClose) els.settingsClose.addEventListener('click', function () {
       hideModal(els.settingsModal);
@@ -213,9 +243,11 @@
     registerParentModalHandlers();
     registerCashoutHandlers();
     registerBonusHandlers();
+    registerTaskUpsertHandlers();
     registerTabHandlers();
     registerUserPopoverHandlers();
     registerModalBackdropCloseHandlers();
+    registerEscapeCloseHandler();
     registerSettingsHandlers();
     runAppStartupSequence();
   }

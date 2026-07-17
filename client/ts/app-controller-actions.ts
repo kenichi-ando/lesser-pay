@@ -1,13 +1,13 @@
 /// <reference path="./global.d.ts" />
 
 type TaskStatus = LPTaskStatus;
-type TaskApiAction = "applyTask" | "approveTask" | "rejectTask" | "withdrawTask";
+type TaskApiAction = "applyTask" | "approveTask" | "rejectTask" | "withdrawTask" | "createTask" | "updateTask";
 type ModalApiAction = "cashout" | "grantBonus";
 type ApiPayloadValue = string | number | null;
-type State = Pick<LPAppState, "parentPin" | "tasks" | "history">;
+type State = Pick<LPAppState, "parentPin" | "tasks" | "history" | "parentMode" | "user">;
 type Elements = Pick<
   LPElements,
-  "toast" | "cashoutAmount" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit"
+  "toast" | "cashoutAmount" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskUpsertSubmit" | "taskUpsertError"
 >;
 type Translator = LPTranslator;
 type BusyTarget = LPBusyTarget;
@@ -22,6 +22,7 @@ interface ControllerDeps {
   api: (action: TaskApiAction | ModalApiAction, payload: Record<string, ApiPayloadValue>) => Promise<unknown>;
   clearDataCache: () => void;
   loadData: (force: boolean) => Promise<void>;
+  isParentMode: () => boolean;
 }
 
 type SoundController = Pick<LPSoundController, "play">;
@@ -38,7 +39,7 @@ interface TaskActionConfig {
   afterSuccess?: (button: HTMLElement) => void;
 }
 
-type TaskActionKind = 'apply' | 'approve' | 'reject' | 'withdraw';
+type TaskActionKind = 'apply' | 'approve' | 'reject' | 'withdraw' | 'edit';
 type TaskActionConfigBase = Omit<TaskActionConfig, 'confirmKey' | 'toastKey'> & {
   confirmKeySuffix: 'Apply' | 'Approve' | 'Reject' | 'Withdraw';
   toastKeyName: 'Applied' | 'Approved' | 'Rejected' | 'Withdrawn';
@@ -169,6 +170,20 @@ function isPositiveNumber(value: number): boolean {
   return !!value && value > 0;
 }
 
+type TaskUpsertMode = 'create' | 'edit';
+
+function normalizeCategory(value: string): string {
+  return (value || '').trim();
+}
+
+function escapeOptionValue(value: string): string {
+  let out = '';
+  for (const ch of value) {
+    out += ch === '"' ? '&quot;' : ch;
+  }
+  return out;
+}
+
 function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTMLElement): void {
   clearError(error);
   modal.classList.remove('hidden');
@@ -184,6 +199,124 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
     const tr = deps.tr;
     const sound: SoundController = (window.LESSERPAY_SOUND || { play: function () {} });
     const withBusy = deps.withBusy;
+    let taskUpsertMode: TaskUpsertMode = 'create';
+    let editingTaskId = '';
+    let fixedCreateCategory: string | null = null;
+
+    function getTaskById(id: string): LPTask | null {
+      const target = String(id);
+      for (const task of state.tasks) {
+        if (String(task.id) === target) return task;
+      }
+      return null;
+    }
+
+    function listKnownCategories(): string[] {
+      const map = new Map<string, true>();
+      for (const task of state.tasks) {
+        const category = normalizeCategory(String(task.category || ''));
+        if (category) map.set(category, true);
+      }
+      return Array.from(map.keys()).sort(function (a, b) { return a.localeCompare(b, 'ja'); });
+    }
+
+    function renderTaskCategoryOptions(selected: string): void {
+      const categories = listKnownCategories();
+      const options = categories.map(function (category) {
+        const isSelected = category === selected;
+        const optionValue = escapeOptionValue(category);
+        return '<option value="' + optionValue + '"' + (isSelected ? ' selected' : '') + '>' + category + '</option>';
+      }).join('');
+      const otherSelected = !!selected && !categories.includes(selected);
+      els.taskCategorySelect.innerHTML = options +
+        '<option value="__other__"' + (otherSelected ? ' selected' : '') + '>' + tr('taskForm.categoryOther') + '</option>';
+      if (!selected && categories.length > 0) {
+        els.taskCategorySelect.value = categories[0];
+      }
+      toggleTaskCategoryCustomField(otherSelected);
+      if (otherSelected) {
+        els.taskCategoryCustom.value = selected;
+      } else {
+        els.taskCategoryCustom.value = '';
+      }
+    }
+
+    function toggleTaskCategoryCustomField(show: boolean): void {
+      els.taskCategoryCustom.classList.toggle('hidden', !show);
+    }
+
+    function selectedTaskCategory(): string {
+      if (els.taskCategorySelect.value === '__other__') {
+        return normalizeCategory(els.taskCategoryCustom.value);
+      }
+      return normalizeCategory(els.taskCategorySelect.value);
+    }
+
+    function closeTaskUpsertModal(): void {
+      els.taskUpsertModal.classList.add('hidden');
+      clearError(els.taskUpsertError);
+      editingTaskId = '';
+      taskUpsertMode = 'create';
+    }
+
+    function openTaskUpsertModalWith(initial: { mode: TaskUpsertMode; taskId?: string; category?: string; title?: string; points?: number; fixedCategory?: string | null }): void {
+      taskUpsertMode = initial.mode;
+      editingTaskId = initial.taskId || '';
+      fixedCreateCategory = initial.fixedCategory || null;
+      if (taskUpsertMode === 'edit') {
+        els.taskUpsertTitle.textContent = tr('taskForm.titleEdit');
+        els.taskUpsertDesc.textContent = tr('taskForm.descEdit');
+        els.taskUpsertSubmit.textContent = tr('taskForm.save');
+      } else if (deps.isParentMode()) {
+        els.taskUpsertTitle.textContent = tr('taskForm.titleCreateParent');
+        els.taskUpsertDesc.textContent = tr('taskForm.descCreateParent');
+        els.taskUpsertSubmit.textContent = tr('taskForm.submit');
+      } else {
+        els.taskUpsertTitle.textContent = tr('taskForm.titleCreateKid');
+        els.taskUpsertDesc.textContent = tr('taskForm.descCreateKid');
+        els.taskUpsertSubmit.textContent = tr('taskForm.submit');
+      }
+      renderTaskCategoryOptions(initial.category || '');
+      const shouldLockCategory = taskUpsertMode === 'create' && !!fixedCreateCategory;
+      if (shouldLockCategory) {
+        els.taskCategorySelect.value = fixedCreateCategory || '';
+        toggleTaskCategoryCustomField(false);
+      }
+      els.taskCategorySelect.classList.toggle('hidden', shouldLockCategory);
+      if (shouldLockCategory) {
+        els.taskCategoryCustom.classList.add('hidden');
+      }
+      els.taskTitleInput.value = initial.title || '';
+      els.taskPointsInput.value = initial.points ? String(initial.points) : '';
+      clearError(els.taskUpsertError);
+      els.taskUpsertModal.classList.remove('hidden');
+      focusSoon(els.taskTitleInput);
+    }
+
+    function openTaskUpsertModal(): void {
+      openTaskUpsertModalWith({ mode: 'create', fixedCategory: null });
+    }
+
+    function openTaskUpsertByCategory(category: string): void {
+      openTaskUpsertModalWith({ mode: 'create', category: category, fixedCategory: category });
+    }
+
+    function openTaskUpsertOther(): void {
+      const other = tr('tasks.otherGroup');
+      openTaskUpsertModalWith({ mode: 'create', category: other, fixedCategory: other });
+    }
+
+    function openTaskEditModal(taskId: string): void {
+      const task = getTaskById(taskId);
+      if (!task) return;
+      openTaskUpsertModalWith({
+        mode: 'edit',
+        taskId: String(task.id),
+        category: String(task.category || ''),
+        title: String(task.title || ''),
+        points: Number(task.completeReward || task.points || 0),
+      });
+    }
 
     const toast: ToastFn = function (message: string, kind = ''): void {
       const kindName = kind;
@@ -299,15 +432,78 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
         apiAction: 'withdrawTask',
         successStatus: 'Pending',
         soundKey: 'reject'
+      }),
+      edit: makeTaskActionConfig({
+        confirmKeySuffix: 'Apply',
+        toastKeyName: 'Applied',
+        apiAction: 'applyTask',
+        soundKey: 'apply'
       })
     };
+
+    async function submitTaskUpsert(): Promise<void> {
+      const title = (els.taskTitleInput.value || '').trim();
+      const points = Number.parseInt(els.taskPointsInput.value, 10);
+      const category = fixedCreateCategory || selectedTaskCategory();
+      if (!title) {
+        failWithError(els.taskUpsertError, tr('taskForm.invalidTitle'));
+        return;
+      }
+      if (!isPositiveNumber(points)) {
+        failWithError(els.taskUpsertError, tr('taskForm.invalidPoints'));
+        return;
+      }
+      const payload: Record<string, ApiPayloadValue> = {
+        category: category,
+        title: title,
+        completeReward: points,
+      };
+      const isEdit = taskUpsertMode === 'edit' && !!editingTaskId;
+      if (isEdit) {
+        payload.taskId = editingTaskId;
+        payload.pin = state.parentPin;
+      } else {
+        payload.role = deps.isParentMode() ? 'parent' : 'child';
+        if (deps.isParentMode()) payload.pin = state.parentPin;
+      }
+      try {
+        await withBusy(els.taskUpsertSubmit, { label: tr('taskForm.processing') }, async function () {
+          await deps.api(isEdit ? 'updateTask' : 'createTask', payload);
+          closeTaskUpsertModal();
+          sound.play(isEdit || deps.isParentMode() ? 'approve' : 'apply');
+          if (isEdit) {
+            toast(tr('tasks.toastUpdated'), 'success');
+          } else if (deps.isParentMode()) {
+            toast(tr('tasks.toastCreated'), 'success');
+          } else {
+            toast(tr('tasks.toastRequested'), 'success');
+          }
+          deps.clearDataCache();
+          await deps.loadData(true);
+        });
+      } catch (error) {
+        showError(els.taskUpsertError, getActionErrorMessage(error));
+      }
+    }
 
     async function onTaskAction(event: Event): Promise<void> {
       const btn = event.currentTarget as HTMLElement | null;
       if (!btn) return;
       const id = btn.dataset.taskId || '';
       const action = btn.dataset.action as TaskActionKind | undefined;
+      if (btn.dataset.action === 'add-category-task') {
+        openTaskUpsertByCategory(btn.dataset.category || '');
+        return;
+      }
+      if (btn.dataset.action === 'add-other-task') {
+        openTaskUpsertOther();
+        return;
+      }
       if (!id || !action) return;
+      if (action === 'edit') {
+        openTaskEditModal(id);
+        return;
+      }
 
       await runTaskAction(btn, id, taskActionMap[action]);
     }
@@ -407,6 +603,12 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
       celebrateBalance({ withLogo: true, toastMessage: tr('tasks.toastApproved') });
     }
 
+    els.taskCategorySelect.addEventListener('change', function () {
+      const showCustom = els.taskCategorySelect.value === '__other__';
+      toggleTaskCategoryCustomField(showCustom);
+      if (showCustom) focusSoon(els.taskCategoryCustom);
+    });
+
     return {
       toast: toast,
       onTaskAction: onTaskAction,
@@ -414,6 +616,8 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
       submitCashout: submitCashout,
       openBonusModal: openBonusModal,
       submitBonus: submitBonus,
+      openTaskUpsertModal: openTaskUpsertModal,
+      submitTaskUpsert: submitTaskUpsert,
       celebrateRemoteApprovals: celebrateRemoteApprovals
     };
   }

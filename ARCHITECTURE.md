@@ -176,10 +176,10 @@ are derived from it.
 | Index | Key                | Notes |
 | ----: | ------------------ | ----- |
 | 0     | `ID`               | Auto-generated on read if blank (`T<unix>_<rand>`) |
-| 1     | `STATUS`           | `STATUS.PENDING` / `SUBMITTED` / `RETURNED` / `APPROVED`. Blank = `PENDING`. |
+| 1     | `STATUS`           | `STATUS.PENDING` / `REQUESTED` / `SUBMITTED` / `RETURNED` / `APPROVED`. Blank = `PENDING`. |
 | 2     | `CATEGORY`         | Used as the group heading in the UI. Empty rows fall under `tasks.otherGroup`. |
 | 3     | `TITLE`            | Required |
-| 4     | `SUBMIT_REWARD`    | Granted on the *first* submit only |
+| 4     | `SUBMIT_REWARD`    | Legacy field. New create/update flows write `0` by design. |
 | 5     | `COMPLETE_REWARD`  | Granted when the parent approves |
 | 6     | `MINUTES`          | Estimated minutes; display only |
 | 7     | `EXPIRY`           | YYYY/MM/DD; tasks past expiry can't be applied |
@@ -226,7 +226,13 @@ re-parse the secret on every call.
 ### Status values
 
 ```ts
-STATUS = { PENDING: 'Pending', SUBMITTED: 'Submitted', RETURNED: 'Returned', APPROVED: 'Approved' }
+STATUS = {
+  PENDING: 'Pending',
+  REQUESTED: 'Requested',
+  SUBMITTED: 'Submitted',
+  RETURNED: 'Returned',
+  APPROVED: 'Approved'
+}
 ```
 
 Authoritative copy is in `server/schema.ts`. The frontend `STATUS` is empty
@@ -237,6 +243,10 @@ propagates after deploy without a matching client change.
 State transitions:
 
 ```
+PENDING ─[child createTask(role=child)]─▶ REQUESTED ─[approveTask]─▶ PENDING
+                    │                                         └─[rejectTask]─▶ RETURNED
+                    └─[parent createTask(role=parent)]─▶ PENDING
+
 PENDING ─[applyTask, +submitReward]─▶ SUBMITTED ─[approveTask, +completeReward]─▶ APPROVED
    ▲                                     │
    │                                     ├─[rejectTask]─▶ RETURNED
@@ -363,7 +373,7 @@ columns in whatever language they prefer without affecting behaviour.
   else to the static `ASSETS` binding. Catches `HttpError` and converts to JSON.
 - `actions.ts` — `ACTIONS` table and the handlers
   (`getConfig`, `getData`, `verifyPin`, `applyTask`, `approveTask`,
-  `rejectTask`, `withdrawTask`, `cashout`, `grantBonus`, `subscribePush`, `unsubscribePush`).
+  `rejectTask`, `withdrawTask`, `createTask`, `updateTask`, `cashout`, `grantBonus`, `subscribePush`, `unsubscribePush`).
   `grantBonus` is parent-only (PIN-protected) and writes a single `🎁 <label>`
   history row without going through the task approval flow — there is no
   `Tasks_` row for bonuses.

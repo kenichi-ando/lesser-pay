@@ -1,4 +1,4 @@
-type SharedTaskStatus = 'Pending' | 'Submitted' | 'Approved' | 'Returned';
+type SharedTaskStatus = 'Pending' | 'Requested' | 'Submitted' | 'Approved' | 'Returned';
 
 interface SharedTask {
   id: string;
@@ -36,6 +36,22 @@ interface SharedActionPayloadMap {
   approveTask: { user: string; taskId: string; pin: string };
   rejectTask: { user: string; taskId: string; pin: string };
   withdrawTask: { user: string; taskId: string };
+  createTask: {
+    user: string;
+    category: string;
+    title: string;
+    completeReward: number;
+    role: 'parent' | 'child';
+    pin?: string;
+  };
+  updateTask: {
+    user: string;
+    taskId: string;
+    category: string;
+    title: string;
+    completeReward: number;
+    pin: string;
+  };
   cashout: { user: string; amount: number; pin: string };
   grantBonus: { user: string; label: string; amount: number; pin: string };
   subscribePush: {
@@ -65,9 +81,11 @@ interface SharedApiOkResponseMap {
   };
   verifyPin: { verified: true };
   applyTask: { taskId: string; status: SharedTaskStatus; history?: SharedHistoryItem };
-  approveTask: { taskId: string; status: SharedTaskStatus; points: number; history: SharedHistoryItem };
+  approveTask: { taskId: string; status: SharedTaskStatus; points?: number; history?: SharedHistoryItem };
   rejectTask: { taskId: string; status: SharedTaskStatus };
   withdrawTask: { taskId: string; status: SharedTaskStatus; history: SharedHistoryItem };
+  createTask: { task: SharedTask };
+  updateTask: { taskId: string; task: SharedTask };
   cashout: { amount: number; balance: number; history: SharedHistoryItem };
   grantBonus: { amount: number; balance: number; history: SharedHistoryItem };
   subscribePush: { subscribed: true };

@@ -17,6 +17,7 @@ export const SHEET_PREFIX = {
 // blank) is treated as PENDING.
 export const STATUS = {
 	PENDING: "Pending",
+	REQUESTED: "Requested",
 	SUBMITTED: "Submitted",
 	RETURNED: "Returned",
 	APPROVED: "Approved",

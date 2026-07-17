@@ -484,7 +484,8 @@
       api: data.api,
       loadData: data.loadData,
       clearDataCache: data.clearDataCache,
-      withBusy: withBusy
+      withBusy: withBusy,
+      isParentMode: function () { return state.parentMode; }
     });
 
     return {
@@ -498,6 +499,8 @@
       submitCashout: actions.submitCashout,
       openBonusModal: actions.openBonusModal,
       submitBonus: actions.submitBonus,
+      openTaskUpsertModal: actions.openTaskUpsertModal,
+      submitTaskUpsert: actions.submitTaskUpsert,
       loadData: data.loadData,
       bootstrap: data.bootstrap,
       onTaskAction: actions.onTaskAction,

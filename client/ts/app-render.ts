@@ -8,6 +8,7 @@
 
   function statusClassOf(task: LPTask, status: ReturnType<LPRendererDeps['getStatus']>): string {
     if (task.status === status.SUBMITTED) return 'status-applied';
+    if (task.status === status.REQUESTED) return 'status-requested';
     if (task.status === status.APPROVED) return 'status-approved';
     if (task.status === status.RETURNED) return 'status-returned';
     return 'status-pending';
@@ -38,6 +39,12 @@
         '          <button class="task-btn reject-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="reject">' + escapeHtml(tr('tasks.reject')) + '</button>\n' +
         '        </div>\n      ';
     }
+    if (state.parentMode && task.status === status.REQUESTED) {
+      return '\n        <div class="task-action-group">\n' +
+        '          <button class="task-btn approve-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="approve">' + escapeHtml(tr('tasks.approve')) + '</button>\n' +
+        '          <button class="task-btn reject-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="reject">' + escapeHtml(tr('tasks.reject')) + '</button>\n' +
+        '        </div>\n      ';
+    }
     if (state.parentMode && (task.status === status.PENDING || task.status === status.RETURNED)) return '';
     if (task.status === status.PENDING) {
       return '<button class="task-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="apply" ' + (expired ? 'disabled' : '') + '>' + escapeHtml(tr('tasks.apply')) + '</button>';
@@ -48,6 +55,9 @@
     if (task.status === status.SUBMITTED) {
       return '<button class="task-btn withdraw-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="withdraw" aria-label="' + escapeHtml(tr('tasks.withdraw')) + '">' + escapeHtml(tr('tasks.appliedBadge')) + '</button>';
     }
+    if (task.status === status.REQUESTED) {
+      return '<span class="task-status-badge">' + escapeHtml(tr('tasks.requestedBadge')) + '</span>';
+    }
     if (task.status === status.APPROVED) {
       return '<span class="task-status-badge">' + escapeHtml(tr('tasks.approvedBadge')) + '</span>';
     }
@@ -55,7 +65,7 @@
   }
 
   function pendingCountOf(items: LPTask[], status: ReturnType<LPRendererDeps['getStatus']>): number {
-    return items.filter(function (t) { return t.status === status.SUBMITTED; }).length;
+    return items.filter(function (t) { return t.status === status.SUBMITTED || t.status === status.REQUESTED; }).length;
   }
 
   function totalMinutesOf(items: LPTask[], status: ReturnType<LPRendererDeps['getStatus']>): number {
@@ -67,18 +77,25 @@
   function taskGroupHtml(
     key: string,
     items: LPTask[],
-    status: ReturnType<LPRendererDeps['getStatus']>,
-    tr: LPTranslator,
-    escapeHtml: LPRendererDeps['escapeHtml'],
-    formatMinutes: LPRendererDeps['formatMinutes'],
+    context: {
+      status: ReturnType<LPRendererDeps['getStatus']>;
+      state: Pick<LPAppState, 'parentMode'>;
+      tr: LPTranslator;
+      escapeHtml: LPRendererDeps['escapeHtml'];
+      formatMinutes: LPRendererDeps['formatMinutes'];
+    },
     taskItemHtml: (task: LPTask) => string
   ): string {
-    const pendingCount = pendingCountOf(items, status);
-    const pendingBadge = pendingCount > 0 ? '<span class="task-group-badge">' + escapeHtml(tr('tasks.pendingCount', { n: pendingCount })) + '</span>' : '';
-    const totalMinutes = totalMinutesOf(items, status);
-    const timeBadge = totalMinutes > 0 ? '<span class="task-group-time">⏱ ' + escapeHtml(formatMinutes(totalMinutes)) + '</span>' : '';
+    const pendingCount = pendingCountOf(items, context.status);
+    const pendingBadge = pendingCount > 0 ? '<span class="task-group-badge">' + context.escapeHtml(context.tr('tasks.pendingCount', { n: pendingCount })) + '</span>' : '';
+    const totalMinutes = totalMinutesOf(items, context.status);
+    const timeBadge = totalMinutes > 0 ? '<span class="task-group-time">⏱ ' + context.escapeHtml(context.formatMinutes(totalMinutes)) + '</span>' : '';
+    const addBtn = '<button class="task-group-add-btn" data-action="add-category-task" data-category="' + context.escapeHtml(key) + '" aria-label="' + context.escapeHtml(context.tr('tasks.addInCategory')) + '" title="' + context.escapeHtml(context.tr('tasks.addInCategory')) + '">＋</button>';
     return '\n        <div class="task-group">\n' +
-      '          <h3 class="task-group-title">' + escapeHtml(key) + timeBadge + pendingBadge + '</h3>\n' +
+      '          <div class="task-group-head">\n' +
+      '            <h3 class="task-group-title">' + context.escapeHtml(key) + timeBadge + pendingBadge + '</h3>\n' +
+      '            ' + addBtn + '\n' +
+      '          </div>\n' +
       '          <div class="task-group-items">\n' +
       '            ' + items.map(taskItemHtml).join('') + '\n' +
       '          </div>\n' +
@@ -125,10 +142,18 @@
       const expired = isExpired(task.expiry);
       const expiryLabel = expiryLabelOf(task, tr, formatDate, isExpired);
       const actionHtml = taskActionHtmlOf(task, state, status, tr, escapeHtml, expired);
+      const requestHint = state.parentMode && task.status === status.REQUESTED
+        ? '<span class="task-request-hint">' + escapeHtml(tr('tasks.requestHint')) + '</span>'
+        : '';
+      const canInlineEdit = state.parentMode && task.status !== status.APPROVED;
+      const inlineEditSlot = canInlineEdit
+        ? '<button class="task-inline-edit-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="edit" aria-label="' + escapeHtml(tr('tasks.edit')) + '">✏️</button>'
+        : '<span class="task-inline-edit-spacer" aria-hidden="true"></span>';
 
       return '\n      <div class="task-item ' + statusClass + '">\n' +
+        '        ' + inlineEditSlot + '\n' +
         '        <div class="task-info">\n' +
-        '          <div class="task-title">' + escapeHtml(task.title) + '</div>\n' +
+        '          <div class="task-title">' + escapeHtml(task.title) + ' ' + requestHint + '</div>\n' +
         '          <div class="task-footer">\n' +
         '            ' + formatRewards(task) + '\n' +
         '            ' + (task.minutes ? '<span class="task-minutes">⏱ ' + escapeHtml(formatMinutes(task.minutes)) + '</span>' : '') + '\n' +
@@ -150,7 +175,10 @@
       els.panelHistory.classList.toggle('hidden', tab !== 'history');
 
       const targetStatus = state.parentMode ? status.SUBMITTED : status.RETURNED;
-      const actionCount = state.tasks.filter(function (t) { return t.status === targetStatus; }).length;
+      const actionCount = state.tasks.filter(function (t) {
+        if (state.parentMode) return t.status === status.SUBMITTED || t.status === status.REQUESTED;
+        return t.status === targetStatus;
+      }).length;
       if (actionCount > 0) {
         els.tabTasksBadge.textContent = String(actionCount);
         els.tabTasksBadge.classList.remove('hidden');
@@ -166,13 +194,20 @@
 
     function renderTasks() {
       const status = getStatus();
+      const addOtherButton = '<div class="tasks-bottom-actions"><button class="task-add-other-btn" data-action="add-other-task">' + escapeHtml(tr('tasks.addOther')) + '</button></div>';
       if (state.loading && state.tasks.length === 0) {
-        els.tasksList.innerHTML = '<div class="empty-state is-loading">' + escapeHtml(tr('tasks.loading')) + '</div>';
+        els.tasksList.innerHTML = '<div class="empty-state is-loading">' + escapeHtml(tr('tasks.loading')) + '</div>' + addOtherButton;
+        els.tasksList.querySelectorAll('[data-action="add-other-task"]').forEach(function (btn) {
+          btn.addEventListener('click', onTaskAction);
+        });
         return;
       }
       const visible = state.tasks;
       if (visible.length === 0) {
-        els.tasksList.innerHTML = '<div class="empty-state">' + escapeHtml(tr('tasks.empty')) + '</div>';
+        els.tasksList.innerHTML = '<div class="empty-state">' + escapeHtml(tr('tasks.empty')) + '</div>' + addOtherButton;
+        els.tasksList.querySelectorAll('[data-action="add-other-task"]').forEach(function (btn) {
+          btn.addEventListener('click', onTaskAction);
+        });
         return;
       }
 
@@ -185,12 +220,22 @@
       });
 
       const sortedKeys = Array.from(groups.keys());
-      els.tasksList.innerHTML = sortedKeys.map(function (key) {
+      const groupsHtml = sortedKeys.map(function (key) {
         const items = groups.get(key) || [];
-        return taskGroupHtml(key, items, status, tr, escapeHtml, formatMinutes, taskItemHtml);
+        return taskGroupHtml(key, items, {
+          status: status,
+          state: state,
+          tr: tr,
+          escapeHtml: escapeHtml,
+          formatMinutes: formatMinutes
+        }, taskItemHtml);
       }).join('');
+      els.tasksList.innerHTML = groupsHtml + addOtherButton;
 
       els.tasksList.querySelectorAll('[data-task-id]').forEach(function (btn) {
+        btn.addEventListener('click', onTaskAction);
+      });
+      els.tasksList.querySelectorAll('[data-action="add-category-task"],[data-action="add-other-task"]').forEach(function (btn) {
         btn.addEventListener('click', onTaskAction);
       });
     }
@@ -230,6 +275,7 @@
       const balanceReady = !(state.loading && state.history.length === 0);
       els.cashoutBtn.classList.toggle('hidden', !state.parentMode || !balanceReady || total <= 0);
       els.bonusBtn.classList.toggle('hidden', !state.parentMode || !balanceReady);
+      els.taskUpsertOpenBtn.classList.add('hidden');
       if (state.user && !state.needsUserSelection) {
         const name = deps.labelOf(state.user);
         const key = state.parentMode ? 'header.currentParent' : 'header.currentKid';

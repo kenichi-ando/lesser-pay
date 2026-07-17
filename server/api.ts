@@ -113,6 +113,8 @@ interface ValueUpdate {
 	value: string;
 }
 
+type WritableValue = string | number;
+
 // Read both task + history sheets in one round trip. Auto-fills missing
 // ID / STATUS in the task rows (writing back to the sheet) and returns the
 // shaped JSON the frontend expects.
@@ -321,6 +323,60 @@ export async function appendHistoryRow(
 	});
 	if (!res.ok) {
 		throw new HttpError(502, `History append failed: ${res.status} ${await res.text()}`);
+	}
+}
+
+export async function appendTaskRow(
+	env: Env,
+	token: string,
+	tasksSheet: string,
+	row: WritableValue[],
+): Promise<void> {
+	const range = `${tasksSheet}!A:${TASK_LAST_COL_LETTER}`;
+	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+	const res = await fetch(url, {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${token}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			range,
+			majorDimension: "ROWS",
+			values: [row],
+		}),
+	});
+	if (!res.ok) {
+		throw new HttpError(502, `Task append failed: ${res.status} ${await res.text()}`);
+	}
+}
+
+export async function updateTaskRow(
+	env: Env,
+	token: string,
+	tasksSheet: string,
+	rowIndex: number,
+	values: Partial<Record<number, WritableValue>>,
+): Promise<void> {
+	const updates = Object.entries(values).map(([index, value]) => ({
+		range: `${tasksSheet}!${colLetter(Number(index) + 1)}${rowIndex}`,
+		values: [[value]],
+	}));
+	if (updates.length === 0) return;
+	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values:batchUpdate`;
+	const res = await fetch(url, {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${token}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			valueInputOption: "USER_ENTERED",
+			data: updates,
+		}),
+	});
+	if (!res.ok) {
+		throw new HttpError(502, `Task update failed: ${res.status} ${await res.text()}`);
 	}
 }
 
