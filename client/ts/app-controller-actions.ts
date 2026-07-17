@@ -7,7 +7,7 @@ type ApiPayloadValue = string | number | null;
 type State = Pick<LPAppState, "parentPin" | "tasks" | "history" | "parentMode" | "user">;
 type Elements = Pick<
   LPElements,
-  "toast" | "cashoutAmount" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskUpsertSubmit" | "taskUpsertError"
+  "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskUpsertSubmit" | "taskUpsertError"
 >;
 type Translator = LPTranslator;
 type BusyTarget = LPBusyTarget;
@@ -511,16 +511,17 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
     function openCashoutModal(): void {
       const total = getTotalHistoryPoints();
       els.cashoutAmount.value = total > 0 ? String(total) : '';
+      els.cashoutMemo.value = '';
       els.cashoutBalance.textContent = tr('cashout.balance', { total: total.toLocaleString() });
       openFormModal(els.cashoutModal, els.cashoutError, els.cashoutAmount);
     }
 
-    function buildCashoutSubmitConfig(amount: number): ModalSubmitConfig {
+    function buildCashoutSubmitConfig(amount: number, memo: string): ModalSubmitConfig {
       return makeModalSubmitConfig({
         submitButton: els.cashoutSubmit,
         processingKey: 'cashout.processing',
         apiAction: 'cashout',
-        payload: function () { return { amount: amount, pin: state.parentPin }; },
+        payload: function () { return { amount: amount, memo: memo, pin: state.parentPin }; },
         onSuccess: function () {
           els.cashoutModal.classList.add('hidden');
           sound.play('cashout');
@@ -532,6 +533,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
 
     async function submitCashout(): Promise<void> {
       const amount = Number.parseInt(els.cashoutAmount.value, 10);
+      const memo = (els.cashoutMemo.value || '').trim();
       if (!isPositiveNumber(amount)) {
         failWithError(els.cashoutError, tr('cashout.invalid'));
         return;
@@ -542,7 +544,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
         return;
       }
       if (!confirm(tr('cashout.confirm', { amount: amount }))) return;
-      await runModalSubmit(buildCashoutSubmitConfig(amount));
+      await runModalSubmit(buildCashoutSubmitConfig(amount, memo));
     }
 
     function openBonusModal(): void {

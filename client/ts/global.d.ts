@@ -110,6 +110,7 @@ interface LPElements {
   parentError: HTMLElement;
   cashoutModal: HTMLElement;
   cashoutAmount: HTMLInputElement;
+  cashoutMemo: HTMLInputElement;
   cashoutSubmit: HTMLElement;
   cashoutCancel: HTMLElement;
   cashoutError: HTMLElement;
@@ -286,7 +287,7 @@ interface Window {
       state: Pick<LPAppState, "parentPin" | "tasks" | "history" | "parentMode" | "user">;
       els: Pick<
         LPElements,
-        "toast" | "cashoutAmount" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskUpsertSubmit" | "taskUpsertError"
+        "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskUpsertSubmit" | "taskUpsertError"
       >;
       tr: LPTranslator;
       withBusy: (target: LPBusyTarget, options: { label: string; labelNode?: HTMLElement }, action: () => Promise<void>) => Promise<void>;

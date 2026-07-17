@@ -80,7 +80,7 @@ export const ACTIONS: Record<ServerActionName, ActionDef> = {
 			completeReward: req.completeReward,
 			pin: req.pin,
 		})),
-	cashout: userAction((req, env) => handleCashout(env, asUser(req), req.amount, req.pin)),
+	cashout: userAction((req, env) => handleCashout(env, asUser(req), req.amount, req.memo, req.pin)),
 	grantBonus: userAction((req, env) =>
 		handleGrantBonus(env, asUser(req), req.label, req.amount, req.pin)),
 	subscribePush: userAction((req, env) =>

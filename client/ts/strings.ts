@@ -88,6 +88,8 @@ const STRINGS = {
     button: '💸 ポイント消費',
     title: 'ポイント消費',
     desc: '使うポイントを入力してください',
+    memoLabel: 'メモ',
+    memoPlaceholder: '使いみち（任意）',
     submit: '使う',
     processing: '処理中…',
     cancel: 'キャンセル',

@@ -7,6 +7,7 @@ import { notify } from "./notify";
 import { HttpError, formatDateTime, toNumber } from "./util";
 
 const BONUS_LABEL_MAX_LEN = 80;
+const CASHOUT_MEMO_MAX_LEN = 80;
 
 function toTextCell(value: unknown): string {
   if (typeof value === "string") return value;
@@ -57,10 +58,15 @@ export async function handleCashout(
   env: Env,
   user: string,
   amount: unknown,
+  memoRaw: unknown,
   pin: unknown,
 ) {
   checkPin(env, pin);
   const amt = parsePositiveAmount(amount);
+  const memo = toTextCell(memoRaw).trim();
+  if (memo.length > CASHOUT_MEMO_MAX_LEN) {
+    throw new HttpError(400, fmt(MSG.errCashoutMemoTooLong, { max: CASHOUT_MEMO_MAX_LEN }));
+  }
 
   const token = await getAccessToken(env);
   const historySheet = SHEET_PREFIX.HISTORY + user;
@@ -72,7 +78,7 @@ export async function handleCashout(
     env,
     token,
     historySheet,
-    HISTORY_LABEL.CASHOUT,
+    memo ? `${HISTORY_LABEL.CASHOUT}: ${memo}` : HISTORY_LABEL.CASHOUT,
     -amt,
   );
   const balance = total - amt;

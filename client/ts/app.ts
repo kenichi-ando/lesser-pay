@@ -65,6 +65,7 @@
     parentError: mustElement('parent-error'),
     cashoutModal: mustElement('cashout-modal'),
     cashoutAmount: mustElement<HTMLInputElement>('cashout-amount'),
+    cashoutMemo: mustElement<HTMLInputElement>('cashout-memo'),
     cashoutSubmit: mustElement('cashout-submit-btn'),
     cashoutCancel: mustElement('cashout-cancel-btn'),
     cashoutError: mustElement('cashout-error'),

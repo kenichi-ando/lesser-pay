@@ -192,7 +192,7 @@ automatically.
 | Index | Key       | Notes |
 | ----: | --------- | ----- |
 | 0     | `DATE`    | `yyyy/MM/dd HH:mm` |
-| 1     | `CONTENT` | Free-form, emoji-prefixed string set by the Worker. Format is `"<emoji> <category> <title>"` for task events (e.g. `"✅ Chores Wash dishes"`, `"📩 Study Spelling drill"`, `"↩️ Study Spelling drill"` for withdrawals), `HISTORY_LABEL.CASHOUT` for cashouts, and `"🎁 <free-form label>"` for parent-granted bonuses (no associated task row). The catalogue of prefixes lives in `schema.ts` `HISTORY_LABEL`. |
+| 1     | `CONTENT` | Free-form, emoji-prefixed string set by the Worker. Format is `"<emoji> <category> <title>"` for task events (e.g. `"✅ Chores Wash dishes"`, `"📩 Study Spelling drill"`, `"↩️ Study Spelling drill"` for withdrawals), `HISTORY_LABEL.CASHOUT` (optionally with `: <memo>`) for cashouts, and `"🎁 <free-form label>"` for parent-granted bonuses (no associated task row). The catalogue of prefixes lives in `schema.ts` `HISTORY_LABEL`. |
 | 2     | `POINTS`  | Positive (reward) or negative (cashout) |
 
 ### Runtime config (wrangler secrets)

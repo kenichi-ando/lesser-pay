@@ -21,6 +21,7 @@ export const MSG = {
 	errTaskTitleTooLong: "タスク名は {max} 文字以内で入力してください",
 	errTaskCategoryTooLong: "分類は {max} 文字以内で入力してください",
 	errInvalidAmount: "金額が不正です",
+	errCashoutMemoTooLong: "メモは {max} 文字以内で入力してください",
 	errInsufficientBalance: "残高不足です (現在 {total} pt)",
 	errBonusLabelMissing: "ボーナスのタイトルを入力してください",
 	errBonusLabelTooLong: "タイトルは {max} 文字以内で入力してください",

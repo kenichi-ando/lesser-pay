@@ -64,6 +64,7 @@ function validateUserTaskPin(body: Record<string, unknown>): ValidationErr | nul
 function validateUserAmountPin(body: Record<string, unknown>): ValidationErr | null {
   if (!isString(body.user)) return missing('user');
   if (!isNumber(body.amount)) return missing('amount');
+  if (body.memo != null && !isString(body.memo)) return missing('memo');
   return isString(body.pin) ? null : missing('pin');
 }
 

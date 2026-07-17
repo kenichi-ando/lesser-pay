@@ -149,6 +149,8 @@
       <div id="cashout-balance" class="cashout-balance"></div>
       <label for="cashout-amount" class="sr-only" data-i18n="cashout.submit">消費ポイント</label>
       <input type="number" id="cashout-amount" class="modal-input" inputmode="numeric" min="1" placeholder="500" />
+      <label for="cashout-memo" class="sr-only" data-i18n="cashout.memoLabel">メモ</label>
+      <input type="text" id="cashout-memo" class="modal-input" maxlength="80" data-i18n-attr-placeholder="cashout.memoPlaceholder" autocomplete="off" />
       <div class="modal-actions">
         <button id="cashout-cancel-btn" class="btn btn-secondary" data-i18n="cashout.cancel"></button>
         <button id="cashout-submit-btn" class="btn btn-primary" data-i18n="cashout.submit"></button>
@@ -162,10 +164,10 @@
       <svg class="modal-mascot" width="64" height="64"><use href="#lesser-panda"/></svg>
       <h3 class="modal-title" data-i18n="bonus.title">ボーナス付与</h3>
       <p class="modal-desc" data-i18n="bonus.desc"></p>
-      <label for="bonus-label" class="sr-only" data-i18n="bonus.labelPlaceholder">内容</label>
-      <input type="text" id="bonus-label" class="modal-input" maxlength="80" data-i18n-attr-placeholder="bonus.labelPlaceholder" autocomplete="off" />
       <label for="bonus-amount" class="sr-only" data-i18n="bonus.pointsPlaceholder">ポイント</label>
       <input type="number" id="bonus-amount" class="modal-input" inputmode="numeric" min="1" data-i18n-attr-placeholder="bonus.pointsPlaceholder" />
+      <label for="bonus-label" class="sr-only" data-i18n="bonus.labelPlaceholder">内容</label>
+      <input type="text" id="bonus-label" class="modal-input" maxlength="80" data-i18n-attr-placeholder="bonus.labelPlaceholder" autocomplete="off" />
       <div class="modal-actions">
         <button id="bonus-cancel-btn" class="btn btn-secondary" data-i18n="bonus.cancel"></button>
         <button id="bonus-submit-btn" class="btn btn-primary" data-i18n="bonus.submit"></button>

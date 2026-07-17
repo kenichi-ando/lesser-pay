@@ -52,7 +52,7 @@ interface SharedActionPayloadMap {
     completeReward: number;
     pin: string;
   };
-  cashout: { user: string; amount: number; pin: string };
+  cashout: { user: string; amount: number; memo?: string; pin: string };
   grantBonus: { user: string; label: string; amount: number; pin: string };
   subscribePush: {
     user: string;
