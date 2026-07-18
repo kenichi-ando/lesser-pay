@@ -234,7 +234,8 @@ STATUS = {
   REQUESTED: 'Requested',
   SUBMITTED: 'Submitted',
   RETURNED: 'Returned',
-  APPROVED: 'Approved'
+  APPROVED: 'Approved',
+  DELETED: 'Deleted'
 }
 ```
 
@@ -261,6 +262,8 @@ PENDING ─[applyTask, +submitReward]─▶ SUBMITTED ─[approveTask, +complete
 
 Approved is terminal. Rejecting an already-approved task is forbidden (avoids
 double payout), and deleting an already-approved task is forbidden as well.
+Parent-side deletion is a soft delete (`STATUS=Deleted`): the row stays in
+Sheets but is omitted from the normal task list response.
 Withdrawal is the *child's* counterpart to reject: it's only
 valid from `SUBMITTED` and lands back in `PENDING` with a compensating history
 row (`-submitReward`, or `0` if none was paid). Re-submitting after a withdraw

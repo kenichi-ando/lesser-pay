@@ -5,7 +5,6 @@ import {
   appendHistoryRow,
   appendTaskRow,
   casTaskStatus,
-  deleteTaskRow,
   findTaskRow,
   getAccessToken,
   readHistoryRows,
@@ -155,6 +154,7 @@ export async function handleApplyTask(env: Env, user: string, taskId: string) {
   const currentStatus = normalizeStatus(row[TASK_COL.STATUS]);
   if (currentStatus === STATUS.SUBMITTED) throw new HttpError(409, MSG.errAlreadyApplied);
   if (currentStatus === STATUS.APPROVED) throw new HttpError(409, MSG.errAlreadyApproved);
+  if (currentStatus === STATUS.DELETED) throw new HttpError(409, MSG.errTaskAlreadyDeleted);
 
   const submitReward = toNumber(row[TASK_COL.SUBMIT_REWARD]);
   const completeReward = toNumber(row[TASK_COL.COMPLETE_REWARD]);
@@ -193,6 +193,7 @@ export async function handleApproveTask(env: Env, user: string, taskId: string, 
 
   const currentStatus = normalizeStatus(row[TASK_COL.STATUS]);
   if (currentStatus === STATUS.APPROVED) throw new HttpError(409, MSG.errAlreadyApproved);
+  if (currentStatus === STATUS.DELETED) throw new HttpError(409, MSG.errTaskAlreadyDeleted);
   if (currentStatus === STATUS.REQUESTED) {
     await casTaskStatus(env, token, tasksSheet, rowIndex, currentStatus, STATUS.PENDING);
     const displayName = resolveDisplayName(env, user);
@@ -381,6 +382,9 @@ export async function handleDeleteTask(
   if (currentStatus === STATUS.APPROVED) {
     throw new HttpError(409, MSG.errCannotDeleteApproved);
   }
-  await deleteTaskRow(env, token, tasksSheet, rowIndex);
+  if (currentStatus === STATUS.DELETED) {
+    throw new HttpError(409, MSG.errTaskAlreadyDeleted);
+  }
+  await casTaskStatus(env, token, tasksSheet, rowIndex, currentStatus, STATUS.DELETED);
   return { taskId, deleted: true as const };
 }

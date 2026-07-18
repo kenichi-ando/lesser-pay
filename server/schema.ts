@@ -21,6 +21,7 @@ export const STATUS = {
 	SUBMITTED: "Submitted",
 	RETURNED: "Returned",
 	APPROVED: "Approved",
+	DELETED: "Deleted",
 } as const;
 
 function consumeSchemaError(_error: unknown): void {

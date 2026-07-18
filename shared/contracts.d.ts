@@ -1,4 +1,4 @@
-type SharedTaskStatus = 'Pending' | 'Requested' | 'Submitted' | 'Approved' | 'Returned';
+type SharedTaskStatus = 'Pending' | 'Requested' | 'Submitted' | 'Approved' | 'Returned' | 'Deleted';
 
 interface SharedTask {
   id: string;
