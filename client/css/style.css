@@ -1207,6 +1207,16 @@ body {
   gap: 12px;
 }
 
+#task-upsert-modal .modal-actions .btn {
+  padding: 10px 8px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+#task-upsert-save-new-btn {
+  flex: 1.25;
+}
+
 .modal-error {
   margin-top: 12px;
   padding: 10px;
@@ -1227,6 +1237,7 @@ body {
   font-weight: 800;
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
 }
 
 .btn:hover {
@@ -1290,7 +1301,7 @@ body {
 /* ---------------- Toast ---------------- */
 .toast {
   position: fixed;
-  bottom: 100px;
+  bottom: calc(20px + var(--safe-area-bottom));
   left: 50%;
   transform: translateX(-50%);
   background: var(--color-dark);

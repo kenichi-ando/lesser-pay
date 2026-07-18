@@ -130,6 +130,7 @@ interface LPElements {
   taskPointsInput: HTMLInputElement;
   taskExpiryInput: HTMLInputElement;
   taskUpsertDelete: HTMLElement;
+  taskUpsertSaveNew: HTMLElement;
   taskUpsertSubmit: HTMLElement;
   taskUpsertCancel: HTMLElement;
   taskUpsertError: HTMLElement;
@@ -178,6 +179,7 @@ interface LPControllerActionsApi {
   openTaskUpsertModal: () => void;
   deleteTaskFromUpsert: () => Promise<void>;
   submitTaskUpsert: () => Promise<void>;
+  submitTaskUpsertAndNew: () => Promise<void>;
   celebrateRemoteApprovals: () => void;
 }
 
@@ -213,6 +215,7 @@ interface LPControllerApi {
   openTaskUpsertModal: () => void;
   deleteTaskFromUpsert: () => Promise<void>;
   submitTaskUpsert: () => Promise<void>;
+  submitTaskUpsertAndNew: () => Promise<void>;
   loadData: (force: boolean) => Promise<void>;
   bootstrap: () => Promise<void>;
   onTaskAction: (event: Event) => Promise<void>;
@@ -293,7 +296,7 @@ interface Window {
       state: Pick<LPAppState, "parentPin" | "tasks" | "history" | "parentMode" | "user">;
       els: Pick<
         LPElements,
-        "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertDelete" | "taskUpsertSubmit" | "taskUpsertError" | "confirmModal" | "confirmMessage" | "confirmCancel" | "confirmOk"
+        "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertDelete" | "taskUpsertSaveNew" | "taskUpsertSubmit" | "taskUpsertError" | "confirmModal" | "confirmMessage" | "confirmCancel" | "confirmOk"
       >;
       tr: LPTranslator;
       withBusy: (target: LPBusyTarget, options: { label: string; labelNode?: HTMLElement }, action: () => Promise<void>) => Promise<void>;

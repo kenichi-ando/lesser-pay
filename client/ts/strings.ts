@@ -80,6 +80,7 @@ const STRINGS = {
     expiryPlaceholder: '任意',
     submit: '送信',
     save: '保存',
+    saveAndNew: '保存＆新規',
     delete: '削除',
     cancel: 'キャンセル',
     processing: '処理中…',

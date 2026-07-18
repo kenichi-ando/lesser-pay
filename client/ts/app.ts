@@ -84,6 +84,7 @@
     taskPointsInput: mustElement<HTMLInputElement>('task-points-input'),
     taskExpiryInput: mustElement<HTMLInputElement>('task-expiry-input'),
     taskUpsertDelete: mustElement('task-upsert-delete-btn'),
+    taskUpsertSaveNew: mustElement('task-upsert-save-new-btn'),
     taskUpsertSubmit: mustElement('task-upsert-submit-btn'),
     taskUpsertCancel: mustElement('task-upsert-cancel-btn'),
     taskUpsertError: mustElement('task-upsert-error'),
@@ -221,6 +222,7 @@
   function registerTaskUpsertHandlers(): void {
     els.taskUpsertOpenBtn.addEventListener('click', controller.openTaskUpsertModal);
     els.taskUpsertDelete.addEventListener('click', controller.deleteTaskFromUpsert);
+    els.taskUpsertSaveNew.addEventListener('click', controller.submitTaskUpsertAndNew);
     els.taskUpsertSubmit.addEventListener('click', controller.submitTaskUpsert);
     els.taskUpsertCancel.addEventListener('click', function () { hideModal(els.taskUpsertModal); });
   }

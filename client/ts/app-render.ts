@@ -6,6 +6,23 @@
     return history.reduce(function (sum, h) { return sum + (Number(h.points) || 0); }, 0);
   }
 
+function compareTextJa(a: string, b: string): number {
+  return a.localeCompare(b, 'ja');
+}
+
+function taskSortKeyText(value: unknown): string {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return '';
+}
+
+function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
+  const byTitle = compareTextJa(taskSortKeyText(a.title), taskSortKeyText(b.title));
+  if (byTitle !== 0) return byTitle;
+  return compareTextJa(taskSortKeyText(a.id), taskSortKeyText(b.id));
+}
+
   function statusClassOf(task: LPTask, status: ReturnType<LPRendererDeps['getStatus']>): string {
     if (task.status === status.SUBMITTED) return 'status-applied';
     if (task.status === status.REQUESTED) return 'status-requested';
@@ -206,10 +223,9 @@
         if (bucket) bucket.push(t);
       });
 
-      // Keep category order as it appears in the sheet (insertion order).
-      const categoryKeys = Array.from(groups.keys());
+      const categoryKeys = Array.from(groups.keys()).sort(compareTextJa);
       const groupsHtml = categoryKeys.map(function (key) {
-        const items = groups.get(key) || [];
+        const items = (groups.get(key) || []).slice().sort(compareTaskByTitleThenId);
         return taskGroupHtml(key, items, {
           status: status,
           state: state,

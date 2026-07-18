@@ -522,6 +522,7 @@
       openTaskUpsertModal: actions.openTaskUpsertModal,
       deleteTaskFromUpsert: actions.deleteTaskFromUpsert,
       submitTaskUpsert: actions.submitTaskUpsert,
+      submitTaskUpsertAndNew: actions.submitTaskUpsertAndNew,
       loadData: data.loadData,
       bootstrap: data.bootstrap,
       onTaskAction: actions.onTaskAction,

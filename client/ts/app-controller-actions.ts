@@ -7,7 +7,7 @@ type ApiPayloadValue = string | number | null;
 type State = Pick<LPAppState, "parentPin" | "tasks" | "history" | "parentMode" | "user">;
 type Elements = Pick<
   LPElements,
-  "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertDelete" | "taskUpsertSubmit" | "taskUpsertError" | "confirmModal" | "confirmMessage" | "confirmCancel" | "confirmOk"
+  "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertDelete" | "taskUpsertSaveNew" | "taskUpsertSubmit" | "taskUpsertError" | "confirmModal" | "confirmMessage" | "confirmCancel" | "confirmOk"
 >;
 type Translator = LPTranslator;
 type BusyTarget = LPBusyTarget;
@@ -335,17 +335,22 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
         els.taskUpsertTitle.textContent = tr('taskForm.titleEdit');
         els.taskUpsertDesc.textContent = tr('taskForm.descEdit');
         els.taskUpsertSubmit.textContent = tr('taskForm.save');
+        els.taskUpsertSaveNew.classList.add('hidden');
         els.taskUpsertDelete.textContent = tr('taskForm.delete');
         els.taskUpsertDelete.classList.remove('hidden');
       } else if (deps.isParentMode()) {
         els.taskUpsertTitle.textContent = tr('taskForm.titleCreateParent');
         els.taskUpsertDesc.textContent = tr('taskForm.descCreateParent');
-        els.taskUpsertSubmit.textContent = tr('taskForm.submit');
+        els.taskUpsertSubmit.textContent = tr('taskForm.save');
+        els.taskUpsertSaveNew.textContent = tr('taskForm.saveAndNew');
+        els.taskUpsertSaveNew.classList.remove('hidden');
         els.taskUpsertDelete.classList.add('hidden');
       } else {
         els.taskUpsertTitle.textContent = tr('taskForm.titleCreateKid');
         els.taskUpsertDesc.textContent = tr('taskForm.descCreateKid');
-        els.taskUpsertSubmit.textContent = tr('taskForm.submit');
+        els.taskUpsertSubmit.textContent = tr('taskForm.save');
+        els.taskUpsertSaveNew.textContent = tr('taskForm.saveAndNew');
+        els.taskUpsertSaveNew.classList.remove('hidden');
         els.taskUpsertDelete.classList.add('hidden');
       }
       renderTaskCategoryOptions(initial.category || '');
@@ -519,57 +524,99 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       })
     };
 
-    async function submitTaskUpsert(): Promise<void> {
-      if (taskUpsertSubmitting) return;
+    function keepTaskUpsertOpenAfterCreate(): void {
+      clearError(els.taskUpsertError);
+      els.taskTitleInput.focus();
+      els.taskTitleInput.select();
+    }
+
+    function parseTaskUpsertInput(): { title: string; points: number; expiry: string; category: string } | null {
       const title = (els.taskTitleInput.value || '').trim();
       const points = Number.parseInt(els.taskPointsInput.value, 10);
       const expiry = normalizeExpiryValue(els.taskExpiryInput.value || '');
       const category = fixedCreateCategory || selectedTaskCategory();
       if (!title) {
         failWithError(els.taskUpsertError, tr('taskForm.invalidTitle'));
-        return;
+        return null;
       }
       if (!isPositiveNumber(points)) {
         failWithError(els.taskUpsertError, tr('taskForm.invalidPoints'));
-        return;
+        return null;
       }
+      return { title: title, points: points, expiry: expiry, category: category };
+    }
+
+    function buildTaskUpsertPayload(input: { title: string; points: number; expiry: string; category: string }, isEdit: boolean): Record<string, ApiPayloadValue> {
       const payload: Record<string, ApiPayloadValue> = {
-        category: category,
-        title: title,
-        completeReward: points,
-        expiry: expiry,
+        category: input.category,
+        title: input.title,
+        completeReward: input.points,
+        expiry: input.expiry,
       };
-      const isEdit = taskUpsertMode === 'edit' && !!editingTaskId;
       if (isEdit) {
         payload.taskId = editingTaskId;
         payload.pin = state.parentPin;
-      } else {
-        payload.role = deps.isParentMode() ? 'parent' : 'child';
-        if (deps.isParentMode()) payload.pin = state.parentPin;
+        return payload;
       }
+      const parentMode = deps.isParentMode();
+      payload.role = parentMode ? 'parent' : 'child';
+      if (parentMode) payload.pin = state.parentPin;
+      return payload;
+    }
+
+    function toastTaskUpsertSuccess(isEdit: boolean): void {
+      if (isEdit) {
+        toast(tr('tasks.toastUpdated'), 'success');
+        return;
+      }
+      if (deps.isParentMode()) {
+        toast(tr('tasks.toastCreated'), 'success');
+        return;
+      }
+      toast(tr('tasks.toastRequested'), 'success');
+    }
+
+    async function submitTaskUpsertCore(keepOpenAfterCreate: boolean): Promise<void> {
+      if (taskUpsertSubmitting) return;
+      const input = parseTaskUpsertInput();
+      if (!input) return;
+      const isEdit = taskUpsertMode === 'edit' && !!editingTaskId;
+      const payload = buildTaskUpsertPayload(input, isEdit);
+      const shouldKeepOpen = !isEdit && keepOpenAfterCreate;
       taskUpsertSubmitting = true;
-      hideFormModal(els.taskUpsertModal, els.taskUpsertError);
+      if (!shouldKeepOpen) {
+        hideFormModal(els.taskUpsertModal, els.taskUpsertError);
+      } else {
+        clearError(els.taskUpsertError);
+      }
       try {
-        await withBusy(els.taskUpsertSubmit, { label: tr('taskForm.processing') }, async function () {
+        const submitButton = shouldKeepOpen ? els.taskUpsertSaveNew : els.taskUpsertSubmit;
+        await withBusy(submitButton, { label: tr('taskForm.processing') }, async function () {
           await deps.api(isEdit ? 'updateTask' : 'createTask', payload);
-          closeTaskUpsertModal();
-          sound.play(isEdit || deps.isParentMode() ? 'approve' : 'apply');
-          if (isEdit) {
-            toast(tr('tasks.toastUpdated'), 'success');
-          } else if (deps.isParentMode()) {
-            toast(tr('tasks.toastCreated'), 'success');
+          if (!shouldKeepOpen) {
+            closeTaskUpsertModal();
           } else {
-            toast(tr('tasks.toastRequested'), 'success');
+            keepTaskUpsertOpenAfterCreate();
           }
+          sound.play(isEdit || deps.isParentMode() ? 'approve' : 'apply');
+          toastTaskUpsertSuccess(isEdit);
           deps.clearDataCache();
           await deps.loadData(true);
         });
       } catch (error) {
-        els.taskUpsertModal.classList.remove('hidden');
+        if (!shouldKeepOpen) els.taskUpsertModal.classList.remove('hidden');
         showError(els.taskUpsertError, getActionErrorMessage(error));
       } finally {
         taskUpsertSubmitting = false;
       }
+    }
+
+    async function submitTaskUpsert(): Promise<void> {
+      await submitTaskUpsertCore(false);
+    }
+
+    async function submitTaskUpsertAndNew(): Promise<void> {
+      await submitTaskUpsertCore(true);
     }
 
     async function deleteTaskFromUpsert(): Promise<void> {
@@ -747,6 +794,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       openTaskUpsertModal: openTaskUpsertModal,
       deleteTaskFromUpsert: deleteTaskFromUpsert,
       submitTaskUpsert: submitTaskUpsert,
+      submitTaskUpsertAndNew: submitTaskUpsertAndNew,
       celebrateRemoteApprovals: celebrateRemoteApprovals
     };
   }
