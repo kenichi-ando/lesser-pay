@@ -115,10 +115,13 @@ async function withBusyState<T>(targets: UtilsBusyTargets, task: () => Promise<T
     function formatDate(source: unknown): string {
       const date = parseDateValue(source);
       if (!date) return unknownToText(source);
-      const y = date.getFullYear();
       const m = String(date.getMonth() + 1).padStart(2, '0');
       const d = String(date.getDate()).padStart(2, '0');
-      return y + '/' + m + '/' + d;
+      const today = new Date();
+      const sameYear = date.getFullYear() === today.getFullYear();
+      // Show a kid-friendly short form by default.
+      if (sameYear) return m + '/' + d;
+      return date.getFullYear() + '/' + m + '/' + d;
     }
 
     function isExpired(source: unknown): boolean {

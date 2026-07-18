@@ -1,13 +1,13 @@
 /// <reference path="./global.d.ts" />
 
 type TaskStatus = LPTaskStatus;
-type TaskApiAction = "applyTask" | "approveTask" | "rejectTask" | "withdrawTask" | "createTask" | "updateTask";
+type TaskApiAction = "applyTask" | "approveTask" | "rejectTask" | "withdrawTask" | "createTask" | "updateTask" | "deleteTask";
 type ModalApiAction = "cashout" | "grantBonus";
 type ApiPayloadValue = string | number | null;
 type State = Pick<LPAppState, "parentPin" | "tasks" | "history" | "parentMode" | "user">;
 type Elements = Pick<
   LPElements,
-  "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertSubmit" | "taskUpsertError"
+  "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertDelete" | "taskUpsertSubmit" | "taskUpsertError"
 >;
 type Translator = LPTranslator;
 type BusyTarget = LPBusyTarget;
@@ -234,6 +234,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
     let editingTaskId = '';
     let fixedCreateCategory: string | null = null;
     let taskUpsertSubmitting = false;
+    let taskDeleteSubmitting = false;
     let cashoutSubmitting = false;
     let bonusSubmitting = false;
     const taskActionInFlight = new Set<string>();
@@ -302,14 +303,18 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
         els.taskUpsertTitle.textContent = tr('taskForm.titleEdit');
         els.taskUpsertDesc.textContent = tr('taskForm.descEdit');
         els.taskUpsertSubmit.textContent = tr('taskForm.save');
+        els.taskUpsertDelete.textContent = tr('taskForm.delete');
+        els.taskUpsertDelete.classList.remove('hidden');
       } else if (deps.isParentMode()) {
         els.taskUpsertTitle.textContent = tr('taskForm.titleCreateParent');
         els.taskUpsertDesc.textContent = tr('taskForm.descCreateParent');
         els.taskUpsertSubmit.textContent = tr('taskForm.submit');
+        els.taskUpsertDelete.classList.add('hidden');
       } else {
         els.taskUpsertTitle.textContent = tr('taskForm.titleCreateKid');
         els.taskUpsertDesc.textContent = tr('taskForm.descCreateKid');
         els.taskUpsertSubmit.textContent = tr('taskForm.submit');
+        els.taskUpsertDelete.classList.add('hidden');
       }
       renderTaskCategoryOptions(initial.category || '');
       const shouldLockCategory = taskUpsertMode === 'create' && !!fixedCreateCategory;
@@ -531,6 +536,29 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       }
     }
 
+    async function deleteTaskFromUpsert(): Promise<void> {
+      if (taskDeleteSubmitting) return;
+      if (taskUpsertMode !== 'edit' || !editingTaskId) return;
+      if (!confirm(tr('taskForm.confirmDelete'))) return;
+      taskDeleteSubmitting = true;
+      hideFormModal(els.taskUpsertModal, els.taskUpsertError);
+      try {
+        await withBusy(els.taskUpsertDelete, { label: tr('taskForm.deleting') }, async function () {
+          await deps.api('deleteTask', { taskId: editingTaskId, pin: state.parentPin });
+          closeTaskUpsertModal();
+          sound.play('reject');
+          toast(tr('tasks.toastDeleted'), 'success');
+          deps.clearDataCache();
+          await deps.loadData(true);
+        });
+      } catch (error) {
+        els.taskUpsertModal.classList.remove('hidden');
+        showError(els.taskUpsertError, getActionErrorMessage(error));
+      } finally {
+        taskDeleteSubmitting = false;
+      }
+    }
+
     async function onTaskAction(event: Event): Promise<void> {
       const btn = event.currentTarget as HTMLElement | null;
       if (!btn) return;
@@ -680,6 +708,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       openBonusModal: openBonusModal,
       submitBonus: submitBonus,
       openTaskUpsertModal: openTaskUpsertModal,
+      deleteTaskFromUpsert: deleteTaskFromUpsert,
       submitTaskUpsert: submitTaskUpsert,
       celebrateRemoteApprovals: celebrateRemoteApprovals
     };

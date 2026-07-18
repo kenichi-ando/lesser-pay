@@ -5,6 +5,7 @@ import {
   appendHistoryRow,
   appendTaskRow,
   casTaskStatus,
+  deleteTaskRow,
   findTaskRow,
   getAccessToken,
   readHistoryRows,
@@ -363,4 +364,23 @@ export async function handleUpdateTask(
       expiry: parsed.expiry,
     },
   };
+}
+
+export async function handleDeleteTask(
+  env: Env,
+  user: string,
+  taskId: string,
+  pin: unknown,
+) {
+  checkPin(env, pin);
+  if (!taskId) throw new HttpError(400, MSG.errTaskIdMissing);
+  const token = await getAccessToken(env);
+  const tasksSheet = taskSheetFor(user);
+  const { rowIndex, row } = await findTaskRow(env, token, tasksSheet, taskId);
+  const currentStatus = normalizeStatus(row[TASK_COL.STATUS]);
+  if (currentStatus === STATUS.APPROVED) {
+    throw new HttpError(409, MSG.errCannotDeleteApproved);
+  }
+  await deleteTaskRow(env, token, tasksSheet, rowIndex);
+  return { taskId, deleted: true as const };
 }

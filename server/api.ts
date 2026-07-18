@@ -380,6 +380,58 @@ export async function updateTaskRow(
 	}
 }
 
+export async function deleteTaskRow(
+	env: Env,
+	token: string,
+	tasksSheet: string,
+	rowIndex: number,
+): Promise<void> {
+	const sheetId = await getSheetIdByTitle(env, token, tasksSheet);
+	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}:batchUpdate`;
+	const res = await fetch(url, {
+		method: "POST",
+		headers: {
+			Authorization: `Bearer ${token}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			requests: [
+				{
+					deleteDimension: {
+						range: {
+							sheetId,
+							dimension: "ROWS",
+							startIndex: rowIndex - 1,
+							endIndex: rowIndex,
+						},
+					},
+				},
+			],
+		}),
+	});
+	if (!res.ok) {
+		throw new HttpError(502, `Task delete failed: ${res.status} ${await res.text()}`);
+	}
+}
+
+async function getSheetIdByTitle(env: Env, token: string, sheetTitle: string): Promise<number> {
+	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}?fields=sheets.properties(sheetId,title)`;
+	const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+	if (!res.ok) {
+		throw new HttpError(502, `Sheet metadata fetch failed: ${res.status} ${await res.text()}`);
+	}
+	const body = (await res.json()) as {
+		sheets?: Array<{ properties?: { sheetId?: number; title?: string } }>;
+	};
+	for (const sheet of body.sheets ?? []) {
+		const properties = sheet.properties;
+		if (properties?.title === sheetTitle && typeof properties.sheetId === "number") {
+			return properties.sheetId;
+		}
+	}
+	throw new HttpError(404, `Sheet not found: ${sheetTitle}`);
+}
+
 // ---------------------------------------------------------------------------
 // Shaping — sheet rows → JSON shape the frontend expects
 // ---------------------------------------------------------------------------

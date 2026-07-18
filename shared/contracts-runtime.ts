@@ -112,6 +112,7 @@ const validators: Record<SharedActionName, ValidationFn> = {
   withdrawTask: validateUserTask,
   createTask: validateCreateTask,
   updateTask: validateUpdateTask,
+  deleteTask: validateUserTaskPin,
   cashout: validateUserAmountPin,
   grantBonus: validateUserLabelAmountPin,
   subscribePush: validateSubscribePush,

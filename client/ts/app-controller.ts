@@ -519,6 +519,7 @@
       openBonusModal: actions.openBonusModal,
       submitBonus: actions.submitBonus,
       openTaskUpsertModal: actions.openTaskUpsertModal,
+      deleteTaskFromUpsert: actions.deleteTaskFromUpsert,
       submitTaskUpsert: actions.submitTaskUpsert,
       loadData: data.loadData,
       bootstrap: data.bootstrap,

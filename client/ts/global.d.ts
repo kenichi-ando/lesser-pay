@@ -129,6 +129,7 @@ interface LPElements {
   taskTitleInput: HTMLInputElement;
   taskPointsInput: HTMLInputElement;
   taskExpiryInput: HTMLInputElement;
+  taskUpsertDelete: HTMLElement;
   taskUpsertSubmit: HTMLElement;
   taskUpsertCancel: HTMLElement;
   taskUpsertError: HTMLElement;
@@ -171,6 +172,7 @@ interface LPControllerActionsApi {
   openBonusModal: () => void;
   submitBonus: () => Promise<void>;
   openTaskUpsertModal: () => void;
+  deleteTaskFromUpsert: () => Promise<void>;
   submitTaskUpsert: () => Promise<void>;
   celebrateRemoteApprovals: () => void;
 }
@@ -205,6 +207,7 @@ interface LPControllerApi {
   openBonusModal: () => void;
   submitBonus: () => Promise<void>;
   openTaskUpsertModal: () => void;
+  deleteTaskFromUpsert: () => Promise<void>;
   submitTaskUpsert: () => Promise<void>;
   loadData: (force: boolean) => Promise<void>;
   bootstrap: () => Promise<void>;
@@ -286,7 +289,7 @@ interface Window {
       state: Pick<LPAppState, "parentPin" | "tasks" | "history" | "parentMode" | "user">;
       els: Pick<
         LPElements,
-        "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertSubmit" | "taskUpsertError"
+        "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertDelete" | "taskUpsertSubmit" | "taskUpsertError"
       >;
       tr: LPTranslator;
       withBusy: (target: LPBusyTarget, options: { label: string; labelNode?: HTMLElement }, action: () => Promise<void>) => Promise<void>;

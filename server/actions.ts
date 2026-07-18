@@ -15,6 +15,7 @@ import {
 	handleApplyTask,
 	handleApproveTask,
 	handleCreateTask,
+	handleDeleteTask,
 	handleRejectTask,
 	handleUpdateTask,
 	handleWithdrawTask,
@@ -82,6 +83,8 @@ export const ACTIONS: Record<ServerActionName, ActionDef> = {
 			expiry: req.expiry,
 			pin: req.pin,
 		})),
+	deleteTask: userAction((req, env) =>
+		handleDeleteTask(env, asUser(req), asTaskId(req), req.pin)),
 	cashout: userAction((req, env) => handleCashout(env, asUser(req), req.amount, req.memo, req.pin)),
 	grantBonus: userAction((req, env) =>
 		handleGrantBonus(env, asUser(req), req.label, req.amount, req.pin)),

@@ -53,6 +53,7 @@ interface SharedActionPayloadMap {
     expiry?: string;
     pin: string;
   };
+  deleteTask: { user: string; taskId: string; pin: string };
   cashout: { user: string; amount: number; memo?: string; pin: string };
   grantBonus: { user: string; label: string; amount: number; pin: string };
   subscribePush: {
@@ -87,6 +88,7 @@ interface SharedApiOkResponseMap {
   withdrawTask: { taskId: string; status: SharedTaskStatus; history: SharedHistoryItem };
   createTask: { task: SharedTask };
   updateTask: { taskId: string; task: SharedTask };
+  deleteTask: { taskId: string; deleted: true };
   cashout: { amount: number; balance: number; history: SharedHistoryItem };
   grantBonus: { amount: number; balance: number; history: SharedHistoryItem };
   subscribePush: { subscribed: true };

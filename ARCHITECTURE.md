@@ -260,7 +260,8 @@ PENDING ─[applyTask, +submitReward]─▶ SUBMITTED ─[approveTask, +complete
 ```
 
 Approved is terminal. Rejecting an already-approved task is forbidden (avoids
-double payout). Withdrawal is the *child's* counterpart to reject: it's only
+double payout), and deleting an already-approved task is forbidden as well.
+Withdrawal is the *child's* counterpart to reject: it's only
 valid from `SUBMITTED` and lands back in `PENDING` with a compensating history
 row (`-submitReward`, or `0` if none was paid). Re-submitting after a withdraw
 therefore pays the submit reward again — the +/- entries cancel out, so the
@@ -384,7 +385,7 @@ columns in whatever language they prefer without affecting behaviour.
   else to the static `ASSETS` binding. Catches `HttpError` and converts to JSON.
 - `actions.ts` — `ACTIONS` table and the handlers
   (`getConfig`, `getData`, `verifyPin`, `applyTask`, `approveTask`,
-  `rejectTask`, `withdrawTask`, `createTask`, `updateTask`, `cashout`, `grantBonus`, `subscribePush`, `unsubscribePush`).
+  `rejectTask`, `withdrawTask`, `createTask`, `updateTask`, `deleteTask`, `cashout`, `grantBonus`, `subscribePush`, `unsubscribePush`).
   `grantBonus` is parent-only (PIN-protected) and writes a single `🎁 <label>`
   history row without going through the task approval flow — there is no
   `Tasks_` row for bonuses.
