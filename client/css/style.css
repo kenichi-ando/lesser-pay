@@ -644,6 +644,9 @@ body {
 }
 
 .task-item {
+  --task-swipe-shift: 56px;
+  --task-swipe-mobile-inset: 8px;
+  --task-swipe-mobile-width: 64px;
   background: var(--color-card);
   border-radius: 18px;
   padding: 0;
@@ -664,6 +667,10 @@ body {
   position: relative;
   z-index: 1;
   transition: transform 0.18s ease;
+}
+
+.task-edge-hover-zone {
+  display: none;
 }
 
 .task-swipe-actions {
@@ -738,13 +745,51 @@ body {
   box-shadow: 0 6px 18px rgba(138, 63, 31, 0.15);
 }
 
-.task-item.has-inline-actions.is-actions-open .task-main {
-  transform: translateX(96px);
-}
-
 .task-item.has-inline-actions.is-actions-open .task-swipe-actions {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* Mobile swipe reveal: show one side button only. */
+@media (pointer: coarse) {
+  .task-item.has-inline-actions.is-actions-open.is-edit-open .task-swipe-actions {
+    left: var(--task-swipe-mobile-inset);
+    right: auto;
+    width: var(--task-swipe-mobile-width);
+    justify-content: flex-start;
+    background: rgba(58, 36, 24, 0.02);
+  }
+
+  .task-item.has-inline-actions.is-actions-open.is-delete-open .task-swipe-actions {
+    left: auto;
+    right: var(--task-swipe-mobile-inset);
+    width: var(--task-swipe-mobile-width);
+    justify-content: flex-end;
+    background: rgba(58, 36, 24, 0.02);
+  }
+
+  .task-item.has-inline-actions .task-swipe-btn {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .task-item.has-inline-actions.is-actions-open.is-edit-open .task-main {
+    transform: translateX(var(--task-swipe-shift));
+  }
+
+  .task-item.has-inline-actions.is-actions-open.is-delete-open .task-main {
+    transform: translateX(calc(-1 * var(--task-swipe-shift)));
+  }
+
+  .task-item.has-inline-actions.is-actions-open.is-edit-open .task-swipe-btn.is-edit {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .task-item.has-inline-actions.is-actions-open.is-delete-open .task-swipe-btn.is-delete {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .task-item.status-applied {
@@ -1026,15 +1071,97 @@ body {
   gap: 10px;
 }
 
+/* Desktop hover affordance: left edge = edit, right edge = delete. */
 @media (pointer: fine) {
+  /* Trigger groups (left/edit vs right/delete). */
+  .task-item.has-inline-actions:is(
+    :has(.task-edge-hover-zone.is-left:hover),
+    :has(.task-swipe-btn.is-edit:hover),
+    :has(.task-swipe-btn.is-edit:focus-visible)
+  ) .task-main {
+    transform: translateX(var(--task-swipe-shift));
+  }
+
+  .task-item.has-inline-actions:is(
+    :has(.task-edge-hover-zone.is-right:hover),
+    :has(.task-swipe-btn.is-delete:hover),
+    :has(.task-swipe-btn.is-delete:focus-visible)
+  ) .task-main {
+    transform: translateX(calc(-1 * var(--task-swipe-shift)));
+  }
+
+  .task-item.has-inline-actions:is(
+    :has(.task-edge-hover-zone.is-left:hover),
+    :has(.task-swipe-btn.is-edit:hover),
+    :has(.task-swipe-btn.is-edit:focus-visible),
+    :has(.task-edge-hover-zone.is-right:hover),
+    :has(.task-swipe-btn.is-delete:hover),
+    :has(.task-swipe-btn.is-delete:focus-visible)
+  ) .task-swipe-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .task-item.has-inline-actions:is(
+    :has(.task-edge-hover-zone.is-left:hover),
+    :has(.task-swipe-btn.is-edit:hover),
+    :has(.task-swipe-btn.is-edit:focus-visible)
+  ) .task-swipe-btn.is-edit {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .task-item.has-inline-actions:is(
+    :has(.task-edge-hover-zone.is-right:hover),
+    :has(.task-swipe-btn.is-delete:hover),
+    :has(.task-swipe-btn.is-delete:focus-visible)
+  ) .task-swipe-btn.is-delete {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .task-item.parent-layout .task-main {
     transform: translateX(0);
-    padding-left: 108px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .task-item.has-inline-actions .task-edge-hover-zone {
+    display: block;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 64px;
+    z-index: 4;
+  }
+
+  .task-item.has-inline-actions .task-edge-hover-zone.is-left {
+    left: 0;
+  }
+
+  .task-item.has-inline-actions .task-edge-hover-zone.is-right {
+    right: 0;
   }
 
   .task-item.has-inline-actions .task-swipe-actions {
-    opacity: 1;
-    pointer-events: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    padding: 0 10px;
+    justify-content: space-between;
+    background: transparent;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .task-item.has-inline-actions .task-swipe-btn {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .task-item.has-inline-actions.is-actions-open .task-main {
+    transform: translateX(0);
   }
 }
 

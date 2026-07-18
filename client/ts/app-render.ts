@@ -1,6 +1,8 @@
 /// <reference path="./global.d.ts" />
 (function () {
   'use strict';
+  const SWIPE_INTENT_PX = 12;
+  const SWIPE_TRIGGER_PX = 24;
 
   function sumHistoryPoints(history: LPHistoryItem[]): number {
     return history.reduce(function (sum, h) { return sum + (Number(h.points) || 0); }, 0);
@@ -114,6 +116,7 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
     pointerId: number | null;
     startX: number;
     startY: number;
+    startOpenSide: 'edit' | 'delete' | '';
     moved: boolean;
     targetItem: HTMLElement | null;
   };
@@ -131,12 +134,54 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
     const swipeState = options.swipeState;
     const closeAllSwipeItems = options.closeAllSwipeItems;
 
+    function closeSwipeItem(): void {
+      item.classList.remove('is-actions-open', 'is-edit-open', 'is-delete-open');
+      if (swipeState.openTaskId === taskId) swipeState.openTaskId = '';
+    }
+
+    function openEdit(): void {
+      closeAllSwipeItems(taskId);
+      item.classList.add('is-actions-open', 'is-edit-open');
+      item.classList.remove('is-delete-open');
+      swipeState.openTaskId = taskId;
+    }
+
+    function openDelete(): void {
+      closeAllSwipeItems(taskId);
+      item.classList.add('is-actions-open', 'is-delete-open');
+      item.classList.remove('is-edit-open');
+      swipeState.openTaskId = taskId;
+    }
+
+    function applyHorizontalSwipe(dx: number): void {
+      if (swipeState.startOpenSide === 'edit') {
+        if (dx < -SWIPE_TRIGGER_PX) closeSwipeItem();
+        return;
+      }
+      if (swipeState.startOpenSide === 'delete') {
+        if (dx > SWIPE_TRIGGER_PX) closeSwipeItem();
+        return;
+      }
+      if (dx > SWIPE_TRIGGER_PX) {
+        openEdit();
+        return;
+      }
+      if (dx < -SWIPE_TRIGGER_PX) openDelete();
+    }
+
     function handlePointerDown(event: PointerEvent): void {
       if (!coarsePointer) return;
       if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
       swipeState.pointerId = event.pointerId;
       swipeState.startX = event.clientX;
       swipeState.startY = event.clientY;
+      if (item.classList.contains('is-edit-open')) {
+        swipeState.startOpenSide = 'edit';
+      } else if (item.classList.contains('is-delete-open')) {
+        swipeState.startOpenSide = 'delete';
+      } else {
+        swipeState.startOpenSide = '';
+      }
       swipeState.moved = false;
       swipeState.targetItem = item;
     }
@@ -146,19 +191,10 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
       if (swipeState.pointerId !== event.pointerId || swipeState.targetItem !== item) return;
       const dx = event.clientX - swipeState.startX;
       const dy = event.clientY - swipeState.startY;
-      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+      if (Math.abs(dx) < SWIPE_INTENT_PX && Math.abs(dy) < SWIPE_INTENT_PX) return;
       swipeState.moved = true;
       if (Math.abs(dy) > Math.abs(dx)) return;
-      if (dx > 24) {
-        closeAllSwipeItems(taskId);
-        item.classList.add('is-actions-open');
-        swipeState.openTaskId = taskId;
-        return;
-      }
-      if (dx < -24) {
-        item.classList.remove('is-actions-open');
-        if (swipeState.openTaskId === taskId) swipeState.openTaskId = '';
-      }
+      applyHorizontalSwipe(dx);
     }
 
     function handlePointerUp(event: PointerEvent): void {
@@ -168,16 +204,17 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
       if (target?.closest('.task-swipe-actions')) {
         // Keep actions open while tapping edit/delete buttons.
         swipeState.pointerId = null;
+        swipeState.startOpenSide = '';
         swipeState.targetItem = null;
         return;
       }
       const dx = event.clientX - swipeState.startX;
-      const shouldClose = swipeState.openTaskId === taskId && (!swipeState.moved || (dx > -24 && dx < 24));
+      const shouldClose = swipeState.openTaskId === taskId && (!swipeState.moved || (dx > -SWIPE_TRIGGER_PX && dx < SWIPE_TRIGGER_PX));
       if (shouldClose) {
-        item.classList.remove('is-actions-open');
-        swipeState.openTaskId = '';
+        closeSwipeItem();
       }
       swipeState.pointerId = null;
+      swipeState.startOpenSide = '';
       swipeState.targetItem = null;
     }
 
@@ -200,6 +237,7 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
       pointerId: null as number | null,
       startX: 0,
       startY: 0,
+      startOpenSide: '' as 'edit' | 'delete' | '',
       moved: false,
       targetItem: null as HTMLElement | null
     };
@@ -239,7 +277,9 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
       const canInlineEdit = state.parentMode;
       const hasInlineActions = canInlineEdit;
       const inlineActions = hasInlineActions
-        ? '\n          <div class="task-swipe-actions" aria-label="' + escapeHtml(tr('tasks.edit')) + ' / ' + escapeHtml(tr('taskForm.delete')) + '">\n' +
+        ? '\n          <div class="task-edge-hover-zone is-left" aria-hidden="true"></div>\n' +
+          '          <div class="task-edge-hover-zone is-right" aria-hidden="true"></div>\n' +
+          '          <div class="task-swipe-actions" aria-label="' + escapeHtml(tr('tasks.edit')) + ' / ' + escapeHtml(tr('taskForm.delete')) + '">\n' +
           '            <button class="task-swipe-btn is-edit" data-task-id="' + escapeHtml(task.id) + '" data-action="edit" aria-label="' + escapeHtml(tr('tasks.edit')) + '" title="' + escapeHtml(tr('tasks.edit')) + '">✏️</button>\n' +
           '            <button class="task-swipe-btn is-delete" data-task-id="' + escapeHtml(task.id) + '" data-action="delete" aria-label="' + escapeHtml(tr('taskForm.delete')) + '" title="' + escapeHtml(tr('taskForm.delete')) + '">🗑️</button>\n' +
           '          </div>\n'
@@ -264,7 +304,7 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
     function closeAllSwipeItems(exceptTaskId: string): void {
       els.tasksList.querySelectorAll<HTMLElement>('.task-item.has-inline-actions.is-actions-open').forEach(function (item) {
         if ((item.dataset.taskItemId || '') === exceptTaskId) return;
-        item.classList.remove('is-actions-open');
+        item.classList.remove('is-actions-open', 'is-edit-open', 'is-delete-open');
       });
       if (!exceptTaskId) swipeState.openTaskId = '';
     }
