@@ -73,7 +73,7 @@ const STRINGS = {
     categoryOther: 'その他',
     categoryCustomPlaceholder: '分類を入力',
     titleLabel: 'タスク名',
-    titlePlaceholder: 'タスク名（例: 算数テスト対策）',
+    titlePlaceholder: 'タスク名（例: テスト対策）',
     pointsLabel: '完了ポイント',
     pointsPlaceholder: '完了ポイント（例: 50）',
     expiryLabel: '期限',
