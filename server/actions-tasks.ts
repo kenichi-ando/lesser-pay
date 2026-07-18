@@ -295,7 +295,6 @@ export async function handleCreateTask(
     submitReward: 0,
     completeReward: parsed.completeReward,
     points: parsed.completeReward,
-    minutes: 0,
     expiry: "",
   };
   const token = await getAccessToken(env);
@@ -347,7 +346,6 @@ export async function handleUpdateTask(
       submitReward: 0,
       completeReward: parsed.completeReward,
       points: parsed.completeReward,
-      minutes: toNumber(row[TASK_COL.MINUTES]),
       expiry: toTextCell(row[TASK_COL.EXPIRY]),
     },
   };

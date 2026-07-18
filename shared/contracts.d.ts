@@ -8,7 +8,6 @@ interface SharedTask {
   submitReward: number;
   completeReward: number;
   points: number;
-  minutes: number;
   expiry: string;
 }
 

@@ -68,12 +68,6 @@
     return items.filter(function (t) { return t.status === status.SUBMITTED || t.status === status.REQUESTED; }).length;
   }
 
-  function totalMinutesOf(items: LPTask[], status: ReturnType<LPRendererDeps['getStatus']>): number {
-    return items
-      .filter(function (t) { return t.status !== status.APPROVED && t.status !== status.SUBMITTED; })
-      .reduce(function (sum, t) { return sum + (Number(t.minutes) || 0); }, 0);
-  }
-
   function taskGroupHtml(
     key: string,
     items: LPTask[],
@@ -82,18 +76,15 @@
       state: Pick<LPAppState, 'parentMode'>;
       tr: LPTranslator;
       escapeHtml: LPRendererDeps['escapeHtml'];
-      formatMinutes: LPRendererDeps['formatMinutes'];
     },
     taskItemHtml: (task: LPTask) => string
   ): string {
     const pendingCount = pendingCountOf(items, context.status);
     const pendingBadge = pendingCount > 0 ? '<span class="task-group-badge">' + context.escapeHtml(context.tr('tasks.pendingCount', { n: pendingCount })) + '</span>' : '';
-    const totalMinutes = totalMinutesOf(items, context.status);
-    const timeBadge = totalMinutes > 0 ? '<span class="task-group-time">⏱ ' + context.escapeHtml(context.formatMinutes(totalMinutes)) + '</span>' : '';
     const addBtn = '<button class="task-group-add-btn" data-action="add-category-task" data-category="' + context.escapeHtml(key) + '" aria-label="' + context.escapeHtml(context.tr('tasks.addInCategory')) + '" title="' + context.escapeHtml(context.tr('tasks.addInCategory')) + '">＋</button>';
     return '\n        <div class="task-group">\n' +
       '          <div class="task-group-head">\n' +
-      '            <h3 class="task-group-title">' + context.escapeHtml(key) + timeBadge + pendingBadge + '</h3>\n' +
+      '            <h3 class="task-group-title">' + context.escapeHtml(key) + pendingBadge + '</h3>\n' +
       '            ' + addBtn + '\n' +
       '          </div>\n' +
       '          <div class="task-group-items">\n' +
@@ -108,7 +99,6 @@
     const tr = deps.tr;
     const getStatus = deps.getStatus;
     const escapeHtml = deps.escapeHtml;
-    const formatMinutes = deps.formatMinutes;
     const formatDate = deps.formatDate;
     const isExpired = deps.isExpired;
     const onTaskAction = deps.onTaskAction;
@@ -156,7 +146,6 @@
         '          <div class="task-title">' + escapeHtml(task.title) + ' ' + requestHint + '</div>\n' +
         '          <div class="task-footer">\n' +
         '            ' + formatRewards(task) + '\n' +
-        '            ' + (task.minutes ? '<span class="task-minutes">⏱ ' + escapeHtml(formatMinutes(task.minutes)) + '</span>' : '') + '\n' +
         '            ' + (expiryLabel ? '<span>' + expiryLabel + '</span>' : '') + '\n' +
         '          </div>\n' +
         '        </div>\n' +
@@ -226,8 +215,7 @@
           status: status,
           state: state,
           tr: tr,
-          escapeHtml: escapeHtml,
-          formatMinutes: formatMinutes
+          escapeHtml: escapeHtml
         }, taskItemHtml);
       }).join('');
       els.tasksList.innerHTML = groupsHtml + addOtherButton;

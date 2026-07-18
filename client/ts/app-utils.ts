@@ -110,8 +110,7 @@ async function withBusyState<T>(targets: UtilsBusyTargets, task: () => Promise<T
 (function () {
   'use strict';
 
-  function create(options: { tr: UtilsTranslator }): LPUtilsApi {
-    const tr = options.tr;
+  function create(_options: { tr: UtilsTranslator }): LPUtilsApi {
 
     function formatDate(source: unknown): string {
       const date = parseDateValue(source);
@@ -131,22 +130,11 @@ async function withBusyState<T>(targets: UtilsBusyTargets, task: () => Promise<T
       return date < today;
     }
 
-    function formatMinutes(mins: unknown): string {
-      const m = Number(mins) || 0;
-      if (m <= 0) return '';
-      const h = Math.floor(m / 60);
-      const r = m % 60;
-      if (h > 0 && r > 0) return tr('time.hourAndMinute', { h: h, m: r });
-      if (h > 0) return tr('time.hour', { h: h });
-      return tr('time.minute', { m: r });
-    }
-
     return {
       escapeHtml: escapeHtmlText,
       parseDate: parseDateValue,
       formatDate: formatDate,
       isExpired: isExpired,
-      formatMinutes: formatMinutes,
       withBusy: function <T>(targets: UtilsBusyTargets, options: UtilsBusyOptions | undefined, task: () => Promise<T>) {
         return withBusyState(targets, task, options || {});
       }

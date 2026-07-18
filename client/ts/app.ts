@@ -13,7 +13,6 @@
   const escapeHtml = utils.escapeHtml;
   const formatDate = utils.formatDate;
   const isExpired = utils.isExpired;
-  const formatMinutes = utils.formatMinutes;
   const withBusy = utils.withBusy;
 
   let STATUS: LPStatusMap = {};
@@ -121,7 +120,6 @@
     tr: tr,
     getStatus: function () { return STATUS; },
     escapeHtml: escapeHtml,
-    formatMinutes: formatMinutes,
     formatDate: formatDate,
     isExpired: isExpired,
     onTaskAction: controller.onTaskAction,

@@ -181,8 +181,7 @@ are derived from it.
 | 3     | `TITLE`            | Required |
 | 4     | `SUBMIT_REWARD`    | Legacy field. New create/update flows write `0` by design. |
 | 5     | `COMPLETE_REWARD`  | Granted when the parent approves |
-| 6     | `MINUTES`          | Estimated minutes; display only |
-| 7     | `EXPIRY`           | YYYY/MM/DD; tasks past expiry can't be applied |
+| 6     | `EXPIRY`           | YYYY/MM/DD; tasks past expiry can't be applied |
 
 To add a column: append a key to `TASK_SCHEMA`. Everything else updates
 automatically.
@@ -401,7 +400,7 @@ columns in whatever language they prefer without affecting behaviour.
 - `app-store.ts` — browser persistence (`lesserpay_user`, `lesserpay_parent_pin`,
   `lesserpay_api_token`).
 - `app-utils.ts` — `escapeHtml`, date parsing/formatting, expired checks,
-  and minutes formatting.
+  and busy-state helpers.
 - `app-render.ts` — pure render layer (`render()`, `renderTabs()`, task/history
   templates). No network calls.
 - `app-controller-data.ts` — API wrapper (`api()`), boot flow (`bootstrap()`),

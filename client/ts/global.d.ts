@@ -151,7 +151,6 @@ interface LPUtilsApi {
   parseDate: (source: unknown) => Date | null;
   formatDate: (source: unknown) => string;
   isExpired: (source: unknown) => boolean;
-  formatMinutes: (mins: unknown) => string;
   withBusy: LPWithBusy;
 }
 
@@ -258,7 +257,6 @@ interface LPRendererDeps {
   tr: LPTranslator;
   getStatus: () => LPStatusMap;
   escapeHtml: (value: unknown) => string;
-  formatMinutes: (mins: unknown) => string;
   formatDate: (source: unknown) => string;
   isExpired: (source: unknown) => boolean;
   onTaskAction: (event: Event) => Promise<void>;

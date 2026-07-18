@@ -57,7 +57,6 @@ export const TASK_SCHEMA = [
 	"TITLE",
 	"SUBMIT_REWARD",
 	"COMPLETE_REWARD",
-	"MINUTES",
 	"EXPIRY",
 ] as const;
 export const TASK_COL = Object.fromEntries(TASK_SCHEMA.map((k, i) => [k, i])) as Record<

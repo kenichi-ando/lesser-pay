@@ -395,7 +395,6 @@ function shapeTasks(rows: unknown[][]) {
 			submitReward: toNumber(r[TASK_COL.SUBMIT_REWARD]),
 			completeReward: toNumber(r[TASK_COL.COMPLETE_REWARD]),
 			points: toNumber(r[TASK_COL.COMPLETE_REWARD]), // back-compat: legacy `points`
-			minutes: toNumber(r[TASK_COL.MINUTES]),
 			expiry: toDateString(r[TASK_COL.EXPIRY]),
 		}));
 }
