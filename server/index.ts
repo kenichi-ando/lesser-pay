@@ -15,6 +15,7 @@ import { ACTIONS, type ActionRequest } from "./actions";
 import type { Env } from "./env";
 import { HttpError, constantTimeEqual, isValidUser } from "./util";
 import { validateActionRequest } from "../shared/contracts-runtime";
+import { runDeadlineReminders } from "./reminders";
 
 export type { Env };
 const INVITE_CODE_PATTERN = /^[A-Z0-9]{6}$/;
@@ -42,6 +43,13 @@ export default {
 			return env.ASSETS.fetch(req);
 		} catch (e: unknown) {
 			return toErrorResponse(e);
+		}
+	},
+	async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+		try {
+			await runDeadlineReminders(env);
+		} catch (err) {
+			console.error("scheduled reminder failed:", err);
 		}
 	},
 } satisfies ExportedHandler<Env>;

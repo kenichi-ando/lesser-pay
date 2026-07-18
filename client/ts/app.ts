@@ -82,6 +82,7 @@
     taskCategoryCustom: mustElement<HTMLInputElement>('task-category-custom'),
     taskTitleInput: mustElement<HTMLInputElement>('task-title-input'),
     taskPointsInput: mustElement<HTMLInputElement>('task-points-input'),
+    taskExpiryInput: mustElement<HTMLInputElement>('task-expiry-input'),
     taskUpsertSubmit: mustElement('task-upsert-submit-btn'),
     taskUpsertCancel: mustElement('task-upsert-cancel-btn'),
     taskUpsertError: mustElement('task-upsert-error'),

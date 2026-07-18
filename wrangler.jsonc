@@ -24,5 +24,8 @@
 		"directory": "./client",
 		"binding": "ASSETS",
 		"run_worker_first": ["/api", "/api/*"]
+	},
+	"triggers": {
+		"crons": ["0 0 * * *"]
 	}
 }

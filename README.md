@@ -186,6 +186,13 @@ VAPID 鍵を後から差し替えた場合、過去の鍵で購読していた�
 - サーバは新規行追加時に `A:H` の次行へ直接 `PUT` するため、Sheets の `append` による列ずれ（例: G:N へ書き込まれる問題）を回避しています
 - 既存シートを移行する場合は、まず `PushSubscriptions` の実データを `A:H` に揃えてください
 
+#### 期限リマインド通知 (自動)
+
+- 毎日 **9:00 JST** に Cron (`0 0 * * *` in UTC) が動きます
+- 各ユーザーの `Tasks_<user>` を見て、**期限が明日** かつ未完了（`Approved` 以外）のタスクを抽出します
+- 子ども本人 (`role=child`) と保護者端末 (`role=parent`) の両方に通知します
+- 二重送信防止のため `DeadlineReminders` シートを自動作成し、当日送信済みタスクを記録します
+
 #### DEBUGモード (`DEBUG_ENDPOINT`)
 
 `DEBUG_ENDPOINT` secret に値を入れると DEBUG モードが有効になります。

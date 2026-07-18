@@ -30,8 +30,7 @@
     state: Pick<LPAppState, 'parentMode'>,
     status: ReturnType<LPRendererDeps['getStatus']>,
     tr: LPTranslator,
-    escapeHtml: LPRendererDeps['escapeHtml'],
-    expired: boolean
+    escapeHtml: LPRendererDeps['escapeHtml']
   ): string {
     if (state.parentMode && task.status === status.SUBMITTED) {
       return '\n        <div class="task-action-group">\n' +
@@ -47,10 +46,10 @@
     }
     if (state.parentMode && (task.status === status.PENDING || task.status === status.RETURNED)) return '';
     if (task.status === status.PENDING) {
-      return '<button class="task-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="apply" ' + (expired ? 'disabled' : '') + '>' + escapeHtml(tr('tasks.apply')) + '</button>';
+      return '<button class="task-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="apply">' + escapeHtml(tr('tasks.apply')) + '</button>';
     }
     if (task.status === status.RETURNED) {
-      return '<button class="task-btn resubmit-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="apply" ' + (expired ? 'disabled' : '') + '>' + escapeHtml(tr('tasks.resubmit')) + '</button>';
+      return '<button class="task-btn resubmit-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="apply">' + escapeHtml(tr('tasks.resubmit')) + '</button>';
     }
     if (task.status === status.SUBMITTED) {
       return '<button class="task-btn withdraw-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="withdraw" aria-label="' + escapeHtml(tr('tasks.withdraw')) + '">' + escapeHtml(tr('tasks.appliedBadge')) + '</button>';
@@ -129,9 +128,8 @@
     function taskItemHtml(task: LPTask) {
       const status = getStatus();
       const statusClass = statusClassOf(task, status);
-      const expired = isExpired(task.expiry);
       const expiryLabel = expiryLabelOf(task, tr, formatDate, isExpired);
-      const actionHtml = taskActionHtmlOf(task, state, status, tr, escapeHtml, expired);
+      const actionHtml = taskActionHtmlOf(task, state, status, tr, escapeHtml);
       const requestHint = state.parentMode && task.status === status.REQUESTED
         ? '<span class="task-request-hint">' + escapeHtml(tr('tasks.requestHint')) + '</span>'
         : '';

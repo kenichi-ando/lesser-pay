@@ -41,6 +41,7 @@ function validateCreateTask(body: Record<string, unknown>): ValidationErr | null
   if (!isString(body.category)) return missing('category');
   if (!isString(body.title)) return missing('title');
   if (!isNumber(body.completeReward)) return missing('completeReward');
+  if (body.expiry != null && !isString(body.expiry)) return missing('expiry');
   if (body.role !== 'parent' && body.role !== 'child') return missing('role');
   if (body.role === 'parent' && !isString(body.pin)) return missing('pin');
   return null;
@@ -52,6 +53,7 @@ function validateUpdateTask(body: Record<string, unknown>): ValidationErr | null
   if (!isString(body.category)) return missing('category');
   if (!isString(body.title)) return missing('title');
   if (!isNumber(body.completeReward)) return missing('completeReward');
+  if (body.expiry != null && !isString(body.expiry)) return missing('expiry');
   return isString(body.pin) ? null : missing('pin');
 }
 

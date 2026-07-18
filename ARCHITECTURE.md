@@ -181,7 +181,7 @@ are derived from it.
 | 3     | `TITLE`            | Required |
 | 4     | `SUBMIT_REWARD`    | Legacy field. New create/update flows write `0` by design. |
 | 5     | `COMPLETE_REWARD`  | Granted when the parent approves |
-| 6     | `EXPIRY`           | YYYY/MM/DD; tasks past expiry can't be applied |
+| 6     | `EXPIRY`           | YYYY/MM/DD; used for deadline display and reminder notifications |
 
 To add a column: append a key to `TASK_SCHEMA`. Everything else updates
 automatically.
@@ -212,6 +212,10 @@ synchronous. Changes require `wrangler secret put …` + `npm run deploy`.
 | `PUSH_VAPID_PUBLIC_KEY`  | ⬜ | VAPID public key (P-256 uncompressed point, base64url). Push is skipped if unset. |
 | `PUSH_VAPID_PRIVATE_KEY` | ⬜ | VAPID private key (`d` JWK component, base64url). Required if public key is set. |
 | `PUSH_SUBJECT`           | ⬜ | Contact identifier in the VAPID JWT `sub` claim. `mailto:you@yourdomain.com` style. APNs rejects clearly fake values. |
+
+Worker Cron trigger:
+
+- `0 0 * * *` (UTC) = daily 09:00 JST deadline reminder job.
 
 `USERS` example:
 
@@ -341,6 +345,14 @@ Re-keying VAPID requires deleting old rows: subscriptions remember the
 public key they were created with, and the push services reject sends
 signed by a mismatched key (`VapidPkHashMismatch` / `VAPID public key
 mismatch`).
+
+### `DeadlineReminders` sheet
+
+Auto-created by the scheduled reminder job. Columns (A:E): `date, user, taskId, expiry, status`.
+
+- Used only for idempotency: if `date + user + taskId` already exists for today (JST),
+  reminder push for that task is skipped.
+- Current rule: remind only tasks due tomorrow and not yet approved (`status !== Approved`).
 
 ## i18n
 

@@ -12,7 +12,7 @@ import {
 } from "./api";
 import { DEBUG_USER_KEY, checkPin, fetchConfig, labelFor } from "./config";
 import { notify } from "./notify";
-import { HttpError, formatDateTime, generateTaskId, isExpired, toNumber } from "./util";
+import { HttpError, formatDateTime, generateTaskId, toNumber } from "./util";
 
 const TASK_TITLE_MAX_LEN = 80;
 const TASK_CATEGORY_MAX_LEN = 40;
@@ -109,7 +109,8 @@ function parseTaskInput(input: {
   category: unknown;
   title: unknown;
   completeReward: unknown;
-}): { category: string; title: string; completeReward: number } {
+  expiry?: unknown;
+}): { category: string; title: string; completeReward: number; expiry: string } {
   const category = toTextCell(input.category).trim();
   const title = toTextCell(input.title).trim();
   if (!title) throw new HttpError(400, MSG.errTaskTitleMissing);
@@ -123,7 +124,23 @@ function parseTaskInput(input: {
   if (!Number.isFinite(completeReward) || completeReward <= 0) {
     throw new HttpError(400, MSG.errInvalidAmount);
   }
-  return { category, title, completeReward };
+  const expiryRaw = toTextCell(input.expiry).trim();
+  const expiry = normalizeExpiry(expiryRaw);
+  return { category, title, completeReward, expiry };
+}
+
+function normalizeExpiry(raw: string): string {
+  if (!raw) return "";
+  const normalized = raw.replaceAll("-", "/");
+  const dateOnly = normalized.slice(0, 10);
+  if (!/^\d{4}\/\d{2}\/\d{2}$/.test(dateOnly)) {
+    throw new HttpError(400, MSG.errInvalidExpiryDate);
+  }
+  const parsed = new Date(dateOnly);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new HttpError(400, MSG.errInvalidExpiryDate);
+  }
+  return dateOnly;
 }
 
 export async function handleApplyTask(env: Env, user: string, taskId: string) {
@@ -137,9 +154,6 @@ export async function handleApplyTask(env: Env, user: string, taskId: string) {
   const currentStatus = normalizeStatus(row[TASK_COL.STATUS]);
   if (currentStatus === STATUS.SUBMITTED) throw new HttpError(409, MSG.errAlreadyApplied);
   if (currentStatus === STATUS.APPROVED) throw new HttpError(409, MSG.errAlreadyApproved);
-
-  const expiry = row[TASK_COL.EXPIRY];
-  if (isExpired(expiry)) throw new HttpError(409, MSG.errExpired);
 
   const submitReward = toNumber(row[TASK_COL.SUBMIT_REWARD]);
   const completeReward = toNumber(row[TASK_COL.COMPLETE_REWARD]);
@@ -281,7 +295,7 @@ export async function handleWithdrawTask(env: Env, user: string, taskId: string)
 export async function handleCreateTask(
   env: Env,
   user: string,
-  input: { category: unknown; title: unknown; completeReward: unknown; role: unknown; pin: unknown },
+  input: { category: unknown; title: unknown; completeReward: unknown; expiry?: unknown; role: unknown; pin: unknown },
 ) {
   const role = input.role === "parent" ? "parent" : "child";
   if (role === "parent") checkPin(env, input.pin);
@@ -295,7 +309,7 @@ export async function handleCreateTask(
     submitReward: 0,
     completeReward: parsed.completeReward,
     points: parsed.completeReward,
-    expiry: "",
+    expiry: parsed.expiry,
   };
   const token = await getAccessToken(env);
   const tasksSheet = taskSheetFor(user);
@@ -306,7 +320,6 @@ export async function handleCreateTask(
     task.title,
     task.submitReward,
     task.completeReward,
-    "",
     task.expiry,
   ]);
   if (role === "child") {
@@ -320,7 +333,7 @@ export async function handleUpdateTask(
   env: Env,
   user: string,
   taskId: string,
-  input: { category: unknown; title: unknown; completeReward: unknown; pin: unknown },
+  input: { category: unknown; title: unknown; completeReward: unknown; expiry?: unknown; pin: unknown },
 ) {
   checkPin(env, input.pin);
   if (!taskId) throw new HttpError(400, MSG.errTaskIdMissing);
@@ -335,6 +348,7 @@ export async function handleUpdateTask(
     [TASK_COL.TITLE]: parsed.title,
     [TASK_COL.COMPLETE_REWARD]: parsed.completeReward,
     [TASK_COL.SUBMIT_REWARD]: 0,
+    [TASK_COL.EXPIRY]: parsed.expiry,
   });
   return {
     taskId,
@@ -346,7 +360,7 @@ export async function handleUpdateTask(
       submitReward: 0,
       completeReward: parsed.completeReward,
       points: parsed.completeReward,
-      expiry: toTextCell(row[TASK_COL.EXPIRY]),
+      expiry: parsed.expiry,
     },
   };
 }

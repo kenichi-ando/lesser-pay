@@ -7,7 +7,7 @@ type ApiPayloadValue = string | number | null;
 type State = Pick<LPAppState, "parentPin" | "tasks" | "history" | "parentMode" | "user">;
 type Elements = Pick<
   LPElements,
-  "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskUpsertSubmit" | "taskUpsertError"
+  "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertSubmit" | "taskUpsertError"
 >;
 type Translator = LPTranslator;
 type BusyTarget = LPBusyTarget;
@@ -170,6 +170,32 @@ function isPositiveNumber(value: number): boolean {
   return !!value && value > 0;
 }
 
+function replaceChar(value: string, from: string, to: string): string {
+  let out = '';
+  for (const ch of value) {
+    out += ch === from ? to : ch;
+  }
+  return out;
+}
+
+function toDateInputValue(source: unknown): string {
+  if (!source) return '';
+  let raw = '';
+  if (typeof source === 'string' || typeof source === 'number' || typeof source === 'boolean') {
+    raw = String(source).trim();
+  }
+  if (!raw) return '';
+  const normalized = replaceChar(raw, '/', '-');
+  const dateOnly = normalized.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateOnly) ? dateOnly : '';
+}
+
+function normalizeExpiryValue(source: string): string {
+  const value = (source || '').trim();
+  if (!value) return '';
+  return replaceChar(value, '-', '/');
+}
+
 type TaskUpsertMode = 'create' | 'edit';
 
 function normalizeCategory(value: string): string {
@@ -259,7 +285,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
       taskUpsertMode = 'create';
     }
 
-    function openTaskUpsertModalWith(initial: { mode: TaskUpsertMode; taskId?: string; category?: string; title?: string; points?: number; fixedCategory?: string | null }): void {
+    function openTaskUpsertModalWith(initial: { mode: TaskUpsertMode; taskId?: string; category?: string; title?: string; points?: number; expiry?: string; fixedCategory?: string | null }): void {
       taskUpsertMode = initial.mode;
       editingTaskId = initial.taskId || '';
       fixedCreateCategory = initial.fixedCategory || null;
@@ -288,6 +314,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
       }
       els.taskTitleInput.value = initial.title || '';
       els.taskPointsInput.value = initial.points ? String(initial.points) : '';
+      els.taskExpiryInput.value = toDateInputValue(initial.expiry || '');
       clearError(els.taskUpsertError);
       els.taskUpsertModal.classList.remove('hidden');
       focusSoon(els.taskTitleInput);
@@ -315,6 +342,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
         category: String(task.category || ''),
         title: String(task.title || ''),
         points: Number(task.completeReward || task.points || 0),
+        expiry: String(task.expiry || ''),
       });
     }
 
@@ -444,6 +472,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
     async function submitTaskUpsert(): Promise<void> {
       const title = (els.taskTitleInput.value || '').trim();
       const points = Number.parseInt(els.taskPointsInput.value, 10);
+      const expiry = normalizeExpiryValue(els.taskExpiryInput.value || '');
       const category = fixedCreateCategory || selectedTaskCategory();
       if (!title) {
         failWithError(els.taskUpsertError, tr('taskForm.invalidTitle'));
@@ -457,6 +486,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
         category: category,
         title: title,
         completeReward: points,
+        expiry: expiry,
       };
       const isEdit = taskUpsertMode === 'edit' && !!editingTaskId;
       if (isEdit) {
@@ -550,7 +580,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
     function openBonusModal(): void {
       els.bonusLabel.value = '';
       els.bonusAmount.value = '';
-      openFormModal(els.bonusModal, els.bonusError, els.bonusLabel);
+      openFormModal(els.bonusModal, els.bonusError, els.bonusAmount);
     }
 
     function buildBonusSubmitConfig(label: string, amount: number): ModalSubmitConfig {

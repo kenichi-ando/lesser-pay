@@ -75,6 +75,8 @@ const STRINGS = {
     titlePlaceholder: '例: 算数テスト対策',
     pointsLabel: '完了ポイント',
     pointsPlaceholder: '50',
+    expiryLabel: '期限',
+    expiryPlaceholder: '任意',
     submit: '送信',
     save: '保存',
     cancel: 'キャンセル',

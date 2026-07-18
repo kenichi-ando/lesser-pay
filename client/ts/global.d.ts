@@ -128,6 +128,7 @@ interface LPElements {
   taskCategoryCustom: HTMLInputElement;
   taskTitleInput: HTMLInputElement;
   taskPointsInput: HTMLInputElement;
+  taskExpiryInput: HTMLInputElement;
   taskUpsertSubmit: HTMLElement;
   taskUpsertCancel: HTMLElement;
   taskUpsertError: HTMLElement;
@@ -285,7 +286,7 @@ interface Window {
       state: Pick<LPAppState, "parentPin" | "tasks" | "history" | "parentMode" | "user">;
       els: Pick<
         LPElements,
-        "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskUpsertSubmit" | "taskUpsertError"
+        "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertSubmit" | "taskUpsertError"
       >;
       tr: LPTranslator;
       withBusy: (target: LPBusyTarget, options: { label: string; labelNode?: HTMLElement }, action: () => Promise<void>) => Promise<void>;

@@ -40,6 +40,7 @@ interface SharedActionPayloadMap {
     category: string;
     title: string;
     completeReward: number;
+    expiry?: string;
     role: 'parent' | 'child';
     pin?: string;
   };
@@ -49,6 +50,7 @@ interface SharedActionPayloadMap {
     category: string;
     title: string;
     completeReward: number;
+    expiry?: string;
     pin: string;
   };
   cashout: { user: string; amount: number; memo?: string; pin: string };
