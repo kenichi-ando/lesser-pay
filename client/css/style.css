@@ -1202,6 +1202,29 @@ body {
   box-shadow: 0 0 0 4px rgba(255, 179, 193, 0.3);
 }
 
+/* iOS Safari fixes for task upsert form controls */
+#task-upsert-modal .modal-input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+#task-upsert-modal #task-category-select {
+  text-align: center;
+  text-align-last: center;
+}
+
+#task-upsert-modal #task-expiry-input {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 54px;
+}
+
+#task-upsert-modal #task-expiry-input::-webkit-date-and-time-value {
+  text-align: center;
+}
+
 .modal-actions {
   display: flex;
   gap: 12px;
@@ -1713,7 +1736,7 @@ body .toast {
 }
 .locked-mascot { display: block; margin: 0 auto 12px; }
 .locked-title  { margin: 0 0 8px; font-size: 22px; color: #7a3618; }
-.locked-desc   { margin: 0 0 16px; color: #6b4527; line-height: 1.6; }
+.locked-desc   { margin: 0 0 16px; color: #6b4527; line-height: 1.6; text-wrap: pretty; }
 .locked-panel .btn {
   width: 100%;
 }

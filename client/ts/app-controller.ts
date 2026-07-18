@@ -425,7 +425,7 @@
 
     async function submitParentLogin() {
       if (submittingParentLogin) return;
-      const pin = els.parentPin.value;
+      const pin = (els.parentPin.value || '').trim();
       if (!pin) {
         showParentError(tr('parent.needPin'));
         return;
@@ -466,6 +466,13 @@
 
     function onParentLoginError(err: unknown) {
       state.parentPin = null;
+      if (err instanceof Error && err.name === 'UnauthorizedError') {
+        // API token is missing/expired or server-side token changed.
+        // Reload so the locked screen appears and user can redeem invite code again.
+        showParentError('認証が切れました。招待コードを再入力します…');
+        setTimeout(function () { location.reload(); }, 300);
+        return;
+      }
       showParentError(err instanceof Error ? err.message : tr('errors.unknown'));
     }
 

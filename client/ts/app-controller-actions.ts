@@ -232,7 +232,6 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
     const withBusy = deps.withBusy;
     let taskUpsertMode: TaskUpsertMode = 'create';
     let editingTaskId = '';
-    let fixedCreateCategory: string | null = null;
     let taskUpsertSubmitting = false;
     let taskDeleteSubmitting = false;
     let cashoutSubmitting = false;
@@ -327,65 +326,89 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       taskUpsertMode = 'create';
     }
 
-    function openTaskUpsertModalWith(initial: { mode: TaskUpsertMode; taskId?: string; category?: string; title?: string; points?: number; expiry?: string; fixedCategory?: string | null; forceOtherCategory?: boolean }): void {
+    function applyTaskUpsertModeUi(isEdit: boolean, isParentCreate: boolean): void {
+      let titleKey = 'taskForm.titleCreateKid';
+      let descKey = 'taskForm.descCreateKid';
+      if (isEdit) {
+        titleKey = 'taskForm.titleEdit';
+        descKey = 'taskForm.descEdit';
+      } else if (isParentCreate) {
+        titleKey = 'taskForm.titleCreateParent';
+        descKey = 'taskForm.descCreateParent';
+      }
+      els.taskUpsertTitle.textContent = tr(titleKey);
+      els.taskUpsertDesc.textContent = tr(descKey);
+      els.taskUpsertSubmit.textContent = tr('taskForm.save');
+      els.taskUpsertSaveNew.textContent = tr('taskForm.saveAndNew');
+      els.taskUpsertSaveNew.classList.toggle('hidden', isEdit);
+      els.taskUpsertDelete.textContent = tr('taskForm.delete');
+      els.taskUpsertDelete.classList.toggle('hidden', !isEdit);
+    }
+
+    function openTaskUpsertModalWith(initial: { mode: TaskUpsertMode; taskId?: string; category?: string; title?: string; points?: number; expiry?: string; forceOtherCategory?: boolean }): void {
       taskUpsertMode = initial.mode;
       editingTaskId = initial.taskId || '';
-      fixedCreateCategory = initial.fixedCategory || null;
-      if (taskUpsertMode === 'edit') {
-        els.taskUpsertTitle.textContent = tr('taskForm.titleEdit');
-        els.taskUpsertDesc.textContent = tr('taskForm.descEdit');
-        els.taskUpsertSubmit.textContent = tr('taskForm.save');
-        els.taskUpsertSaveNew.classList.add('hidden');
-        els.taskUpsertDelete.textContent = tr('taskForm.delete');
-        els.taskUpsertDelete.classList.remove('hidden');
-      } else if (deps.isParentMode()) {
-        els.taskUpsertTitle.textContent = tr('taskForm.titleCreateParent');
-        els.taskUpsertDesc.textContent = tr('taskForm.descCreateParent');
-        els.taskUpsertSubmit.textContent = tr('taskForm.save');
-        els.taskUpsertSaveNew.textContent = tr('taskForm.saveAndNew');
-        els.taskUpsertSaveNew.classList.remove('hidden');
-        els.taskUpsertDelete.classList.add('hidden');
-      } else {
-        els.taskUpsertTitle.textContent = tr('taskForm.titleCreateKid');
-        els.taskUpsertDesc.textContent = tr('taskForm.descCreateKid');
-        els.taskUpsertSubmit.textContent = tr('taskForm.save');
-        els.taskUpsertSaveNew.textContent = tr('taskForm.saveAndNew');
-        els.taskUpsertSaveNew.classList.remove('hidden');
-        els.taskUpsertDelete.classList.add('hidden');
-      }
+      const isEdit = taskUpsertMode === 'edit';
+      const isParentCreate = !isEdit && deps.isParentMode();
+      applyTaskUpsertModeUi(isEdit, isParentCreate);
       renderTaskCategoryOptions(initial.category || '');
       if (taskUpsertMode === 'create' && initial.forceOtherCategory) {
         els.taskCategorySelect.value = '__other__';
         toggleTaskCategoryCustomField(true);
         els.taskCategoryCustom.value = '';
       }
-      const shouldLockCategory = taskUpsertMode === 'create' && !!fixedCreateCategory;
-      if (shouldLockCategory) {
-        els.taskCategorySelect.value = fixedCreateCategory || '';
-        toggleTaskCategoryCustomField(false);
-      }
-      els.taskCategorySelect.classList.toggle('hidden', shouldLockCategory);
-      if (shouldLockCategory) {
-        els.taskCategoryCustom.classList.add('hidden');
-      }
+      els.taskCategorySelect.classList.remove('hidden');
       els.taskTitleInput.value = initial.title || '';
       els.taskPointsInput.value = initial.points ? String(initial.points) : '';
       els.taskExpiryInput.value = toDateInputValue(initial.expiry || '');
+      syncTaskExpiryInputType();
       clearError(els.taskUpsertError);
       els.taskUpsertModal.classList.remove('hidden');
-      focusSoon(els.taskTitleInput);
+      focusSoon(preferredTaskUpsertFocusTarget());
+    }
+
+    function preferredTaskUpsertFocusTarget(): HTMLElement {
+      if (!els.taskCategorySelect.classList.contains('hidden')) return els.taskCategorySelect;
+      if (!els.taskCategoryCustom.classList.contains('hidden')) return els.taskCategoryCustom;
+      return els.taskTitleInput;
+    }
+
+    function syncTaskExpiryInputType(forceDate?: boolean): void {
+      const hasValue = !!(els.taskExpiryInput.value || '').trim();
+      const asDate = !!forceDate || hasValue;
+      const nextType = asDate ? 'date' : 'text';
+      if (els.taskExpiryInput.type !== nextType) els.taskExpiryInput.type = nextType;
+    }
+
+    function setupTaskExpiryInputBehavior(): void {
+      syncTaskExpiryInputType();
+      els.taskExpiryInput.addEventListener('focus', function () {
+        syncTaskExpiryInputType(true);
+        if (typeof els.taskExpiryInput.showPicker === 'function') {
+          try { els.taskExpiryInput.showPicker(); } catch {}
+        }
+      });
+      els.taskExpiryInput.addEventListener('click', function () {
+        syncTaskExpiryInputType(true);
+      });
+      els.taskExpiryInput.addEventListener('blur', function () {
+        syncTaskExpiryInputType();
+      });
+      els.taskExpiryInput.addEventListener('change', function () {
+        syncTaskExpiryInputType();
+      });
     }
 
     function openTaskUpsertModal(): void {
-      openTaskUpsertModalWith({ mode: 'create', fixedCategory: null });
+      openTaskUpsertModalWith({ mode: 'create' });
     }
 
     function openTaskUpsertByCategory(category: string): void {
-      openTaskUpsertModalWith({ mode: 'create', category: category, fixedCategory: category });
+      openTaskUpsertModalWith({ mode: 'create', category: category });
     }
 
     function openTaskUpsertOther(): void {
-      openTaskUpsertModalWith({ mode: 'create', forceOtherCategory: true, fixedCategory: null });
+      openTaskUpsertModalWith({ mode: 'create', forceOtherCategory: true });
     }
 
     function openTaskEditModal(taskId: string): void {
@@ -534,7 +557,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       const title = (els.taskTitleInput.value || '').trim();
       const points = Number.parseInt(els.taskPointsInput.value, 10);
       const expiry = normalizeExpiryValue(els.taskExpiryInput.value || '');
-      const category = fixedCreateCategory || selectedTaskCategory();
+      const category = selectedTaskCategory();
       if (!title) {
         failWithError(els.taskUpsertError, tr('taskForm.invalidTitle'));
         return null;
@@ -565,15 +588,10 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
     }
 
     function toastTaskUpsertSuccess(isEdit: boolean): void {
-      if (isEdit) {
-        toast(tr('tasks.toastUpdated'), 'success');
-        return;
-      }
-      if (deps.isParentMode()) {
-        toast(tr('tasks.toastCreated'), 'success');
-        return;
-      }
-      toast(tr('tasks.toastRequested'), 'success');
+      let key = 'tasks.toastRequested';
+      if (isEdit) key = 'tasks.toastUpdated';
+      else if (deps.isParentMode()) key = 'tasks.toastCreated';
+      toast(tr(key), 'success');
     }
 
     async function submitTaskUpsertCore(keepOpenAfterCreate: boolean): Promise<void> {
@@ -782,6 +800,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       toggleTaskCategoryCustomField(showCustom);
       if (showCustom) focusSoon(els.taskCategoryCustom);
     });
+    setupTaskExpiryInputBehavior();
     setupConfirmHandlers();
 
     return {
