@@ -647,6 +647,7 @@ body {
   --task-swipe-shift: 56px;
   --task-swipe-mobile-inset: 8px;
   --task-swipe-mobile-width: 64px;
+  --task-hover-edge-width-desktop: 14px;
   background: var(--color-card);
   border-radius: 18px;
   padding: 0;
@@ -1131,7 +1132,7 @@ body {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 64px;
+    width: var(--task-hover-edge-width-desktop);
     z-index: 4;
   }
 
