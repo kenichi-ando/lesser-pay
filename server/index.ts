@@ -32,7 +32,7 @@ export default {
 		const url = new URL(req.url);
 
 		if (req.method === "OPTIONS") {
-			return new Response(null, { status: 204, headers: corsHeaders() });
+			return handleOptions(req, url);
 		}
 
 		try {
@@ -177,21 +177,28 @@ function isValidApiToken(value: string): boolean {
 	);
 }
 
-function corsHeaders(): Record<string, string> {
-	return {
-		"Access-Control-Allow-Origin": "*",
-		"Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-		"Access-Control-Allow-Headers": "Content-Type, Authorization",
-		"Access-Control-Max-Age": "86400",
-	};
-}
-
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
 		status,
 		headers: {
 			"Content-Type": "application/json; charset=utf-8",
-			...corsHeaders(),
+		},
+	});
+}
+
+function handleOptions(req: Request, url: URL): Response {
+	const origin = req.headers.get("Origin");
+	if (!origin || origin !== url.origin) {
+		return new Response(null, { status: 403 });
+	}
+	return new Response(null, {
+		status: 204,
+		headers: {
+			"Access-Control-Allow-Origin": origin,
+			"Access-Control-Allow-Methods": "POST, OPTIONS",
+			"Access-Control-Allow-Headers": "Content-Type, Authorization",
+			"Access-Control-Max-Age": "86400",
+			Vary: "Origin",
 		},
 	});
 }

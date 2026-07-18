@@ -39,7 +39,7 @@ interface TaskActionConfig {
   afterSuccess?: (button: HTMLElement) => void;
 }
 
-type TaskActionKind = 'apply' | 'approve' | 'reject' | 'withdraw' | 'edit';
+type TaskActionKind = 'apply' | 'approve' | 'reject' | 'withdraw';
 type TaskActionConfigBase = Omit<TaskActionConfig, 'confirmKey' | 'toastKey'> & {
   confirmKeySuffix: 'Apply' | 'Approve' | 'Reject' | 'Withdraw';
   toastKeyName: 'Applied' | 'Approved' | 'Rejected' | 'Withdrawn';
@@ -216,6 +216,11 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
   focusSoon(focusTarget);
 }
 
+function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
+  clearError(error);
+  modal.classList.add('hidden');
+}
+
 (function bootstrap() {
   'use strict';
 
@@ -228,6 +233,10 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
     let taskUpsertMode: TaskUpsertMode = 'create';
     let editingTaskId = '';
     let fixedCreateCategory: string | null = null;
+    let taskUpsertSubmitting = false;
+    let cashoutSubmitting = false;
+    let bonusSubmitting = false;
+    const taskActionInFlight = new Set<string>();
 
     function getTaskById(id: string): LPTask | null {
       const target = String(id);
@@ -384,7 +393,10 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
     }
 
     async function runTaskAction(btn: HTMLElement, id: string, config: TaskActionConfig): Promise<void> {
+      const flightKey = id + ':' + config.apiAction;
+      if (taskActionInFlight.has(flightKey)) return;
       if (!confirm(tr(config.confirmKey))) return;
+      taskActionInFlight.add(flightKey);
       try {
         await withBusy(taskButtons(id), { label: tr('tasks.processing'), labelNode: btn }, async function () {
           await executeTaskActionRequest(id, config);
@@ -395,6 +407,8 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
       } catch (error) {
         sound.play('error');
         toast(getActionErrorMessage(error), 'error');
+      } finally {
+        taskActionInFlight.delete(flightKey);
       }
     }
 
@@ -421,6 +435,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
         });
       } catch (error) {
         config.onError(error);
+        throw error;
       }
     }
 
@@ -460,16 +475,11 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
         apiAction: 'withdrawTask',
         successStatus: 'Pending',
         soundKey: 'reject'
-      }),
-      edit: makeTaskActionConfig({
-        confirmKeySuffix: 'Apply',
-        toastKeyName: 'Applied',
-        apiAction: 'applyTask',
-        soundKey: 'apply'
       })
     };
 
     async function submitTaskUpsert(): Promise<void> {
+      if (taskUpsertSubmitting) return;
       const title = (els.taskTitleInput.value || '').trim();
       const points = Number.parseInt(els.taskPointsInput.value, 10);
       const expiry = normalizeExpiryValue(els.taskExpiryInput.value || '');
@@ -496,6 +506,8 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
         payload.role = deps.isParentMode() ? 'parent' : 'child';
         if (deps.isParentMode()) payload.pin = state.parentPin;
       }
+      taskUpsertSubmitting = true;
+      hideFormModal(els.taskUpsertModal, els.taskUpsertError);
       try {
         await withBusy(els.taskUpsertSubmit, { label: tr('taskForm.processing') }, async function () {
           await deps.api(isEdit ? 'updateTask' : 'createTask', payload);
@@ -512,7 +524,10 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
           await deps.loadData(true);
         });
       } catch (error) {
+        els.taskUpsertModal.classList.remove('hidden');
         showError(els.taskUpsertError, getActionErrorMessage(error));
+      } finally {
+        taskUpsertSubmitting = false;
       }
     }
 
@@ -520,7 +535,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
       const btn = event.currentTarget as HTMLElement | null;
       if (!btn) return;
       const id = btn.dataset.taskId || '';
-      const action = btn.dataset.action as TaskActionKind | undefined;
+      const action = btn.dataset.action as TaskActionKind | 'edit' | undefined;
       if (btn.dataset.action === 'add-category-task') {
         openTaskUpsertByCategory(btn.dataset.category || '');
         return;
@@ -553,7 +568,6 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
         apiAction: 'cashout',
         payload: function () { return { amount: amount, memo: memo, pin: state.parentPin }; },
         onSuccess: function () {
-          els.cashoutModal.classList.add('hidden');
           sound.play('cashout');
           celebrateBalance({ toastMessage: tr('cashout.toast', { amount: amount }) });
         },
@@ -562,6 +576,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
     }
 
     async function submitCashout(): Promise<void> {
+      if (cashoutSubmitting) return;
       const amount = Number.parseInt(els.cashoutAmount.value, 10);
       const memo = (els.cashoutMemo.value || '').trim();
       if (!isPositiveNumber(amount)) {
@@ -574,7 +589,15 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
         return;
       }
       if (!confirm(tr('cashout.confirm', { amount: amount }))) return;
-      await runModalSubmit(buildCashoutSubmitConfig(amount, memo));
+      hideFormModal(els.cashoutModal, els.cashoutError);
+      cashoutSubmitting = true;
+      try {
+        await runModalSubmit(buildCashoutSubmitConfig(amount, memo));
+      } catch {
+        els.cashoutModal.classList.remove('hidden');
+      } finally {
+        cashoutSubmitting = false;
+      }
     }
 
     function openBonusModal(): void {
@@ -590,7 +613,6 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
         apiAction: 'grantBonus',
         payload: function () { return { label: label, amount: amount, pin: state.parentPin }; },
         onSuccess: function () {
-          els.bonusModal.classList.add('hidden');
           sound.play('approve');
           celebrateBalance({ withLogo: true, toastMessage: tr('bonus.toast', { amount: amount }) });
         },
@@ -599,6 +621,7 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
     }
 
     async function submitBonus(): Promise<void> {
+      if (bonusSubmitting) return;
       const label = (els.bonusLabel.value || '').trim();
       const amount = Number.parseInt(els.bonusAmount.value, 10);
       if (!label) {
@@ -610,7 +633,15 @@ function openFormModal(modal: HTMLElement, error: HTMLElement, focusTarget: HTML
         return;
       }
       if (!confirm(tr('bonus.confirm', { label: label, amount: amount }))) return;
-      await runModalSubmit(buildBonusSubmitConfig(label, amount));
+      hideFormModal(els.bonusModal, els.bonusError);
+      bonusSubmitting = true;
+      try {
+        await runModalSubmit(buildBonusSubmitConfig(label, amount));
+      } catch {
+        els.bonusModal.classList.remove('hidden');
+      } finally {
+        bonusSubmitting = false;
+      }
     }
 
     function getTotalHistoryPoints(): number {

@@ -206,8 +206,9 @@
         if (bucket) bucket.push(t);
       });
 
-      const sortedKeys = Array.from(groups.keys());
-      const groupsHtml = sortedKeys.map(function (key) {
+      // Keep category order as it appears in the sheet (insertion order).
+      const categoryKeys = Array.from(groups.keys());
+      const groupsHtml = categoryKeys.map(function (key) {
         const items = groups.get(key) || [];
         return taskGroupHtml(key, items, {
           status: status,

@@ -115,6 +115,9 @@
     const runtime = deps.runtime;
     const withBusy = deps.withBusy;
     let controllerData: LPControllerDataApi | null = null;
+    let switchingUser = false;
+    let openingLoginSelection = false;
+    let submittingParentLogin = false;
 
     function userKeys() {
       return state.serverUsers.map(function (u) { return u.key; });
@@ -216,11 +219,15 @@
     }
 
     async function openLoginUserSelection() {
+      if (openingLoginSelection) return;
+      openingLoginSelection = true;
       closeUserPopover();
       try {
         await data.refreshServerConfig();
       } catch (err) {
         actions.toast(err instanceof Error && err.message ? err.message : tr('errors.network'), 'error');
+      } finally {
+        openingLoginSelection = false;
       }
       showUserSelection(makeLoginUserSelectionOptions(state));
     }
@@ -322,12 +329,13 @@
     }
 
     async function selectChildUser(selection: string, shouldToast: boolean) {
+      // Close immediately so the tap feels accepted.
+      hideUserSelection();
       await switchUser(selection, {
         silent: !shouldToast,
         toastKey: 'users.switchedLoginToast',
         forceExitParentMode: true
       });
-      hideUserSelection();
     }
 
     async function switchUser(key: string, options: {
@@ -336,11 +344,14 @@
       silent?: boolean;
       forceExitParentMode?: boolean;
     }) {
+      if (switchingUser) return;
+      switchingUser = true;
       const opts = options || {};
       const forceExitParentMode = !!opts.forceExitParentMode;
       const sameUser = key === state.user;
       if (!canSwitchUser(key, sameUser, forceExitParentMode, state)) {
         closeUserPopover();
+        switchingUser = false;
         return;
       }
       closeUserPopover();
@@ -357,7 +368,11 @@
       if (!opts.silent) {
         actions.toast(tr(opts.toastKey || 'users.switchedToast', { name: labelOf(key) }), 'success');
       }
-      await data.loadData(true);
+      try {
+        await data.loadData(true);
+      } finally {
+        switchingUser = false;
+      }
     }
 
     function clearParentError() {
@@ -407,11 +422,13 @@
     }
 
     async function submitParentLogin() {
+      if (submittingParentLogin) return;
       const pin = els.parentPin.value;
       if (!pin) {
         showParentError(tr('parent.needPin'));
         return;
       }
+      submittingParentLogin = true;
       await runSubmitWithBusy(
         els.parentSubmit,
         tr('parent.checking'),
@@ -421,6 +438,7 @@
         },
         onParentLoginError
       );
+      submittingParentLogin = false;
       resetParentSwitchToast();
     }
 
