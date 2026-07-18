@@ -327,7 +327,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       taskUpsertMode = 'create';
     }
 
-    function openTaskUpsertModalWith(initial: { mode: TaskUpsertMode; taskId?: string; category?: string; title?: string; points?: number; expiry?: string; fixedCategory?: string | null }): void {
+    function openTaskUpsertModalWith(initial: { mode: TaskUpsertMode; taskId?: string; category?: string; title?: string; points?: number; expiry?: string; fixedCategory?: string | null; forceOtherCategory?: boolean }): void {
       taskUpsertMode = initial.mode;
       editingTaskId = initial.taskId || '';
       fixedCreateCategory = initial.fixedCategory || null;
@@ -349,6 +349,11 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
         els.taskUpsertDelete.classList.add('hidden');
       }
       renderTaskCategoryOptions(initial.category || '');
+      if (taskUpsertMode === 'create' && initial.forceOtherCategory) {
+        els.taskCategorySelect.value = '__other__';
+        toggleTaskCategoryCustomField(true);
+        els.taskCategoryCustom.value = '';
+      }
       const shouldLockCategory = taskUpsertMode === 'create' && !!fixedCreateCategory;
       if (shouldLockCategory) {
         els.taskCategorySelect.value = fixedCreateCategory || '';
@@ -375,8 +380,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
     }
 
     function openTaskUpsertOther(): void {
-      const other = tr('tasks.otherGroup');
-      openTaskUpsertModalWith({ mode: 'create', category: other, fixedCategory: other });
+      openTaskUpsertModalWith({ mode: 'create', forceOtherCategory: true, fixedCategory: null });
     }
 
     function openTaskEditModal(taskId: string): void {
