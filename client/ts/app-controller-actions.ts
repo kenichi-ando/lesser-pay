@@ -312,6 +312,11 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       els.taskCategoryCustom.classList.toggle('hidden', !show);
     }
 
+    function syncTaskPointsLocked(): void {
+      els.taskPointsInput.disabled = false;
+      els.taskPointsInput.setAttribute('aria-disabled', 'false');
+    }
+
     function selectedTaskCategory(): string {
       if (els.taskCategorySelect.value === '__other__') {
         return normalizeCategory(els.taskCategoryCustom.value);
@@ -341,8 +346,10 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       els.taskUpsertSubmit.textContent = tr('taskForm.save');
       els.taskUpsertSaveNew.textContent = tr('taskForm.saveAndNew');
       els.taskUpsertSaveNew.classList.toggle('hidden', isEdit);
+      // Deletion is handled from the task tile swipe actions to reduce
+      // accidental taps in the edit dialog.
       els.taskUpsertDelete.textContent = tr('taskForm.delete');
-      els.taskUpsertDelete.classList.toggle('hidden', !isEdit);
+      els.taskUpsertDelete.classList.add('hidden');
     }
 
     function openTaskUpsertModalWith(initial: { mode: TaskUpsertMode; taskId?: string; category?: string; title?: string; points?: number; expiry?: string; forceOtherCategory?: boolean }): void {
@@ -351,6 +358,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       const isEdit = taskUpsertMode === 'edit';
       const isParentCreate = !isEdit && deps.isParentMode();
       applyTaskUpsertModeUi(isEdit, isParentCreate);
+      syncTaskPointsLocked();
       renderTaskCategoryOptions(initial.category || '');
       if (taskUpsertMode === 'create' && initial.forceOtherCategory) {
         els.taskCategorySelect.value = '__other__';
@@ -637,15 +645,16 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       await submitTaskUpsertCore(true);
     }
 
-    async function deleteTaskFromUpsert(): Promise<void> {
+    async function deleteTaskById(taskId: string): Promise<void> {
       if (taskDeleteSubmitting) return;
-      if (taskUpsertMode !== 'edit' || !editingTaskId) return;
+      if (!taskId) return;
       if (!await askConfirm(tr('taskForm.confirmDelete'))) return;
       taskDeleteSubmitting = true;
-      hideFormModal(els.taskUpsertModal, els.taskUpsertError);
+      const shouldHideModal = !els.taskUpsertModal.classList.contains('hidden');
+      if (shouldHideModal) hideFormModal(els.taskUpsertModal, els.taskUpsertError);
       try {
-        await withBusy(els.taskUpsertDelete, { label: tr('taskForm.deleting') }, async function () {
-          await deps.api('deleteTask', { taskId: editingTaskId, pin: state.parentPin });
+        await withBusy(taskButtons(taskId), { label: tr('taskForm.deleting') }, async function () {
+          await deps.api('deleteTask', { taskId: taskId, pin: state.parentPin });
           closeTaskUpsertModal();
           sound.play('reject');
           toast(tr('tasks.toastDeleted'), 'success');
@@ -653,18 +662,23 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
           await deps.loadData(true);
         });
       } catch (error) {
-        els.taskUpsertModal.classList.remove('hidden');
+        if (shouldHideModal) els.taskUpsertModal.classList.remove('hidden');
         showError(els.taskUpsertError, getActionErrorMessage(error));
       } finally {
         taskDeleteSubmitting = false;
       }
     }
 
+    async function deleteTaskFromUpsert(): Promise<void> {
+      if (taskUpsertMode !== 'edit' || !editingTaskId) return;
+      await deleteTaskById(editingTaskId);
+    }
+
     async function onTaskAction(event: Event): Promise<void> {
       const btn = event.currentTarget as HTMLElement | null;
       if (!btn) return;
       const id = btn.dataset.taskId || '';
-      const action = btn.dataset.action as TaskActionKind | 'edit' | undefined;
+      const action = btn.dataset.action as TaskActionKind | 'edit' | 'delete' | undefined;
       if (btn.dataset.action === 'add-category-task') {
         openTaskUpsertByCategory(btn.dataset.category || '');
         return;
@@ -676,6 +690,10 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       if (!id || !action) return;
       if (action === 'edit') {
         openTaskEditModal(id);
+        return;
+      }
+      if (action === 'delete') {
+        await deleteTaskById(id);
         return;
       }
 

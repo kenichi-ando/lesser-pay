@@ -221,7 +221,6 @@
 
   function registerTaskUpsertHandlers(): void {
     els.taskUpsertOpenBtn.addEventListener('click', controller.openTaskUpsertModal);
-    els.taskUpsertDelete.addEventListener('click', controller.deleteTaskFromUpsert);
     els.taskUpsertSaveNew.addEventListener('click', controller.submitTaskUpsertAndNew);
     els.taskUpsertSubmit.addEventListener('click', controller.submitTaskUpsert);
     els.taskUpsertCancel.addEventListener('click', function () { hideModal(els.taskUpsertModal); });

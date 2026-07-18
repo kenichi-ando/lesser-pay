@@ -260,10 +260,10 @@ PENDING ─[applyTask, +submitReward]─▶ SUBMITTED ─[approveTask, +complete
    └─[withdrawTask, -submitReward]───────┘   (child cancels their own submission)
 ```
 
-Approved is terminal. Rejecting an already-approved task is forbidden (avoids
-double payout), and deleting an already-approved task is forbidden as well.
+Rejecting an already-approved task is forbidden (avoids double payout).
 Parent-side deletion is a soft delete (`STATUS=Deleted`): the row stays in
-Sheets but is omitted from the normal task list response.
+Sheets but is omitted from the normal task list response. Approved tasks can be
+edited/deleted by parent operations in the current policy.
 Withdrawal is the *child's* counterpart to reject: it's only
 valid from `SUBMITTED` and lands back in `PENDING` with a compensating history
 row (`-submitReward`, or `0` if none was paid). Re-submitting after a withdraw
@@ -418,7 +418,8 @@ columns in whatever language they prefer without affecting behaviour.
 - `app-utils.ts` — `escapeHtml`, date parsing/formatting, expired checks,
   and busy-state helpers.
 - `app-render.ts` — pure render layer (`render()`, `renderTabs()`, task/history
-  templates). No network calls.
+  templates). No network calls. Parent-mode task tiles render left-side
+  edit/delete affordances (desktop: always visible; mobile: revealed by swipe).
 - `app-controller-data.ts` — API wrapper (`api()`), boot flow (`bootstrap()`),
   config refresh, cache-aware `loadData()`, and locked-screen rendering.
 - `app-controller-actions.ts` — mutation-side UI actions (`apply/approve/reject`,

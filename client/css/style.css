@@ -646,44 +646,98 @@ body {
 .task-item {
   background: var(--color-card);
   border-radius: 18px;
-  padding: 14px 16px;
+  padding: 0;
   box-shadow: var(--shadow-sm);
+  border-left: 6px solid var(--color-primary);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.task-main {
+  background: inherit;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  border-left: 6px solid var(--color-primary);
+  padding: 14px 16px;
   position: relative;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  z-index: 1;
+  transition: transform 0.18s ease;
 }
 
-.task-inline-edit-btn {
-  flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid var(--color-border);
-  background: #fff;
-  cursor: pointer;
-  font-size: 16px;
+.task-swipe-actions {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 96px;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  background: rgba(58, 36, 24, 0.04);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 3;
+}
+
+.task-swipe-btn {
+  width: 48px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 18px;
   line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, color 0.12s ease;
+  position: relative;
+  z-index: 0;
 }
 
-.task-inline-edit-spacer {
-  flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  display: inline-block;
+.task-swipe-btn::before {
+  content: "";
+  width: 32px;
+  height: 32px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1.5px solid rgba(58, 36, 24, 0.24);
+  background: rgba(111, 90, 71, 0.16);
+  box-shadow: 0 1px 2px rgba(58, 36, 24, 0.08);
+  position: absolute;
+  z-index: -1;
 }
 
-.task-inline-edit-btn:hover {
-  border-color: var(--color-primary-light);
-  background: #fff8ef;
+.task-swipe-btn:hover {
+  color: var(--color-primary-dark);
+}
+
+.task-swipe-btn:hover::before {
+  background: rgba(111, 90, 71, 0.24);
+  border-color: rgba(58, 36, 24, 0.34);
+}
+
+.task-swipe-btn.is-delete {
+  color: #8a3f1f;
 }
 
 .task-item:hover {
   transform: translateX(3px);
   box-shadow: 0 6px 18px rgba(138, 63, 31, 0.15);
+}
+
+.task-item.has-inline-actions.is-actions-open .task-main {
+  transform: translateX(96px);
+}
+
+.task-item.has-inline-actions.is-actions-open .task-swipe-actions {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .task-item.status-applied {
@@ -699,6 +753,9 @@ body {
 .task-item.status-approved {
   border-left-color: var(--color-pink-strong);
   background: linear-gradient(90deg, #ffe6ec 0%, #ffffff 30%);
+}
+
+.task-item.status-approved .task-info {
   opacity: 0.78;
 }
 
@@ -960,6 +1017,18 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+@media (pointer: fine) {
+  .task-item.parent-layout .task-main {
+    transform: translateX(0);
+    padding-left: 108px;
+  }
+
+  .task-item.has-inline-actions .task-swipe-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 /* ---------------- History ---------------- */

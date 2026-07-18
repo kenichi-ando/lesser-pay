@@ -17,7 +17,6 @@ export const MSG = {
 	errExpired: "期限切れです",
 	errNotAppliedTask: "申請中の課題ではありません (現在: {status})",
 	errCannotRejectApproved: "承認済みの課題は訂正依頼できません",
-	errCannotDeleteApproved: "承認済みの課題は削除できません",
 	errTaskAlreadyDeleted: "この課題はすでに削除済みです",
 	errTaskTitleMissing: "タスク名を入力してください",
 	errTaskTitleTooLong: "タスク名は {max} 文字以内で入力してください",

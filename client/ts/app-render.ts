@@ -109,6 +109,83 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
       '        </div>\n      ';
   }
 
+  type TaskSwipeState = {
+    openTaskId: string;
+    pointerId: number | null;
+    startX: number;
+    startY: number;
+    moved: boolean;
+    targetItem: HTMLElement | null;
+  };
+
+  function bindSwipeHandlersForItem(options: {
+    item: HTMLElement;
+    taskId: string;
+    coarsePointer: boolean;
+    swipeState: TaskSwipeState;
+    closeAllSwipeItems: (exceptTaskId: string) => void;
+  }): void {
+    const item = options.item;
+    const taskId = options.taskId;
+    const coarsePointer = options.coarsePointer;
+    const swipeState = options.swipeState;
+    const closeAllSwipeItems = options.closeAllSwipeItems;
+
+    function handlePointerDown(event: PointerEvent): void {
+      if (!coarsePointer) return;
+      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
+      swipeState.pointerId = event.pointerId;
+      swipeState.startX = event.clientX;
+      swipeState.startY = event.clientY;
+      swipeState.moved = false;
+      swipeState.targetItem = item;
+    }
+
+    function handlePointerMove(event: PointerEvent): void {
+      if (!coarsePointer) return;
+      if (swipeState.pointerId !== event.pointerId || swipeState.targetItem !== item) return;
+      const dx = event.clientX - swipeState.startX;
+      const dy = event.clientY - swipeState.startY;
+      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+      swipeState.moved = true;
+      if (Math.abs(dy) > Math.abs(dx)) return;
+      if (dx > 24) {
+        closeAllSwipeItems(taskId);
+        item.classList.add('is-actions-open');
+        swipeState.openTaskId = taskId;
+        return;
+      }
+      if (dx < -24) {
+        item.classList.remove('is-actions-open');
+        if (swipeState.openTaskId === taskId) swipeState.openTaskId = '';
+      }
+    }
+
+    function handlePointerUp(event: PointerEvent): void {
+      if (!coarsePointer) return;
+      if (swipeState.pointerId !== event.pointerId || swipeState.targetItem !== item) return;
+      const target = event.target as Element | null;
+      if (target?.closest('.task-swipe-actions')) {
+        // Keep actions open while tapping edit/delete buttons.
+        swipeState.pointerId = null;
+        swipeState.targetItem = null;
+        return;
+      }
+      const dx = event.clientX - swipeState.startX;
+      const shouldClose = swipeState.openTaskId === taskId && (!swipeState.moved || (dx > -24 && dx < 24));
+      if (shouldClose) {
+        item.classList.remove('is-actions-open');
+        swipeState.openTaskId = '';
+      }
+      swipeState.pointerId = null;
+      swipeState.targetItem = null;
+    }
+
+    item.addEventListener('pointerdown', handlePointerDown, { passive: true });
+    item.addEventListener('pointermove', handlePointerMove, { passive: true });
+    item.addEventListener('pointerup', handlePointerUp, { passive: true });
+  }
+
   function create(deps: LPRendererDeps): LPRendererApi {
     const state = deps.state;
     const els = deps.els;
@@ -118,6 +195,15 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
     const formatDate = deps.formatDate;
     const isExpired = deps.isExpired;
     const onTaskAction = deps.onTaskAction;
+    const swipeState: TaskSwipeState = {
+      openTaskId: '',
+      pointerId: null as number | null,
+      startX: 0,
+      startY: 0,
+      moved: false,
+      targetItem: null as HTMLElement | null
+    };
+    let swipeDocumentBound = false;
 
     function formatRewards(task: LPTask) {
       const sub = Number(task.submitReward) || 0;
@@ -150,22 +236,63 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
       const requestHint = state.parentMode && task.status === status.REQUESTED
         ? '<span class="task-request-hint">' + escapeHtml(tr('tasks.requestHint')) + '</span>'
         : '';
-      const canInlineEdit = state.parentMode && task.status !== status.APPROVED;
-      const inlineEditSlot = canInlineEdit
-        ? '<button class="task-inline-edit-btn" data-task-id="' + escapeHtml(task.id) + '" data-action="edit" aria-label="' + escapeHtml(tr('tasks.edit')) + '">✏️</button>'
-        : '<span class="task-inline-edit-spacer" aria-hidden="true"></span>';
+      const canInlineEdit = state.parentMode;
+      const hasInlineActions = canInlineEdit;
+      const inlineActions = hasInlineActions
+        ? '\n          <div class="task-swipe-actions" aria-label="' + escapeHtml(tr('tasks.edit')) + ' / ' + escapeHtml(tr('taskForm.delete')) + '">\n' +
+          '            <button class="task-swipe-btn is-edit" data-task-id="' + escapeHtml(task.id) + '" data-action="edit" aria-label="' + escapeHtml(tr('tasks.edit')) + '" title="' + escapeHtml(tr('tasks.edit')) + '">✏️</button>\n' +
+          '            <button class="task-swipe-btn is-delete" data-task-id="' + escapeHtml(task.id) + '" data-action="delete" aria-label="' + escapeHtml(tr('taskForm.delete')) + '" title="' + escapeHtml(tr('taskForm.delete')) + '">🗑️</button>\n' +
+          '          </div>\n'
+        : '';
 
-      return '\n      <div class="task-item ' + statusClass + '">\n' +
-        '        ' + inlineEditSlot + '\n' +
-        '        <div class="task-info">\n' +
+      const parentLayoutClass = state.parentMode ? ' parent-layout' : '';
+      return '\n      <div class="task-item ' + statusClass + parentLayoutClass + (hasInlineActions ? ' has-inline-actions' : '') + '" data-task-item-id="' + escapeHtml(task.id) + '">\n' +
+        inlineActions +
+        '        <div class="task-main">\n' +
+        '          <div class="task-info">\n' +
         '          <div class="task-title">' + escapeHtml(task.title) + ' ' + requestHint + '</div>\n' +
         '          <div class="task-footer">\n' +
         '            ' + formatRewards(task) + '\n' +
         '            ' + (expiryLabel ? '<span>' + expiryLabel + '</span>' : '') + '\n' +
         '          </div>\n' +
+        '          </div>\n' +
+        '          <div class="task-action">' + actionHtml + '</div>\n' +
         '        </div>\n' +
-        '        <div class="task-action">' + actionHtml + '</div>\n' +
         '      </div>\n    ';
+    }
+
+    function closeAllSwipeItems(exceptTaskId: string): void {
+      els.tasksList.querySelectorAll<HTMLElement>('.task-item.has-inline-actions.is-actions-open').forEach(function (item) {
+        if ((item.dataset.taskItemId || '') === exceptTaskId) return;
+        item.classList.remove('is-actions-open');
+      });
+      if (!exceptTaskId) swipeState.openTaskId = '';
+    }
+
+    function setupTaskSwipeInteractions(): void {
+      const coarsePointer = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+      els.tasksList.querySelectorAll<HTMLElement>('.task-item.has-inline-actions').forEach(function (item) {
+        const taskId = item.dataset.taskItemId || '';
+        if (!taskId) return;
+        bindSwipeHandlersForItem({
+          item: item,
+          taskId: taskId,
+          coarsePointer: coarsePointer,
+          swipeState: swipeState,
+          closeAllSwipeItems: closeAllSwipeItems
+        });
+      });
+
+      if (!coarsePointer) return;
+      if (!swipeDocumentBound) {
+        document.addEventListener('pointerdown', function (event) {
+          const target = event.target as Node | null;
+          if (!target) return;
+          if (els.tasksList.contains(target)) return;
+          closeAllSwipeItems('');
+        });
+        swipeDocumentBound = true;
+      }
     }
 
     function renderTabs() {
@@ -241,6 +368,7 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
       els.tasksList.querySelectorAll('[data-action="add-category-task"],[data-action="add-other-task"]').forEach(function (btn) {
         btn.addEventListener('click', onTaskAction);
       });
+      setupTaskSwipeInteractions();
     }
 
     function renderHistory() {

@@ -344,7 +344,7 @@ export async function handleUpdateTask(
   const tasksSheet = taskSheetFor(user);
   const { row, rowIndex } = await findTaskRow(env, token, tasksSheet, taskId);
   const currentStatus = normalizeStatus(row[TASK_COL.STATUS]);
-  if (currentStatus === STATUS.APPROVED) throw new HttpError(409, MSG.errAlreadyApproved);
+  if (currentStatus === STATUS.DELETED) throw new HttpError(409, MSG.errTaskAlreadyDeleted);
   await updateTaskRow(env, token, tasksSheet, rowIndex, {
     [TASK_COL.CATEGORY]: parsed.category,
     [TASK_COL.TITLE]: parsed.title,
@@ -379,9 +379,6 @@ export async function handleDeleteTask(
   const tasksSheet = taskSheetFor(user);
   const { rowIndex, row } = await findTaskRow(env, token, tasksSheet, taskId);
   const currentStatus = normalizeStatus(row[TASK_COL.STATUS]);
-  if (currentStatus === STATUS.APPROVED) {
-    throw new HttpError(409, MSG.errCannotDeleteApproved);
-  }
   if (currentStatus === STATUS.DELETED) {
     throw new HttpError(409, MSG.errTaskAlreadyDeleted);
   }
