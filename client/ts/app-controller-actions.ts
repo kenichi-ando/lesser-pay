@@ -570,6 +570,10 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
         failWithError(els.taskUpsertError, tr('taskForm.invalidTitle'));
         return null;
       }
+      if (!category) {
+        failWithError(els.taskUpsertError, tr('taskForm.invalidCategory'));
+        return null;
+      }
       if (!isPositiveNumber(points)) {
         failWithError(els.taskUpsertError, tr('taskForm.invalidPoints'));
         return null;

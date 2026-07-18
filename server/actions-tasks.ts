@@ -114,6 +114,7 @@ function parseTaskInput(input: {
   const category = toTextCell(input.category).trim();
   const title = toTextCell(input.title).trim();
   if (!title) throw new HttpError(400, MSG.errTaskTitleMissing);
+  if (!category) throw new HttpError(400, MSG.errTaskCategoryMissing);
   if (title.length > TASK_TITLE_MAX_LEN) {
     throw new HttpError(400, fmt(MSG.errTaskTitleTooLong, { max: TASK_TITLE_MAX_LEN }));
   }

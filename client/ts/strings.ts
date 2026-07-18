@@ -71,7 +71,7 @@ const STRINGS = {
     descEdit: 'タスク内容を更新します',
     category: '分類',
     categoryOther: 'その他',
-    categoryCustomPlaceholder: '分類を入力',
+    categoryCustomPlaceholder: '分類を入力（例: お手伝い）',
     titleLabel: 'タスク名',
     titlePlaceholder: 'タスク名（例: テスト対策）',
     pointsLabel: '完了ポイント',
@@ -86,6 +86,7 @@ const STRINGS = {
     processing: '処理中…',
     deleting: '削除中…',
     confirmDelete: 'このタスクを削除します。よろしいですか？',
+    invalidCategory: '分類を入力してください',
     invalidTitle: '項目名を入力してください',
     invalidPoints: '正しいポイントを入力してください'
   },

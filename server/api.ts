@@ -332,22 +332,35 @@ export async function appendTaskRow(
 	tasksSheet: string,
 	row: WritableValue[],
 ): Promise<void> {
-	const range = `${tasksSheet}!A:${TASK_LAST_COL_LETTER}`;
-	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
-	const res = await fetch(url, {
-		method: "POST",
+	// Use explicit row update instead of :append so writes always land on A:G.
+	// Google Sheets append can anchor to a shifted table region (e.g. F:L).
+	const readRange = `${tasksSheet}!A2:${TASK_LAST_COL_LETTER}`;
+	const readUrl = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(readRange)}?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`;
+	const readRes = await fetch(readUrl, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	if (!readRes.ok) {
+		throw new HttpError(404, `Task sheet not found: ${tasksSheet} (${readRes.status})`);
+	}
+	const readBody = (await readRes.json()) as { values?: unknown[][] };
+	const values = readBody.values ?? [];
+	const nextRow = values.length + 2;
+	const writeRange = `${tasksSheet}!A${nextRow}:${TASK_LAST_COL_LETTER}${nextRow}`;
+	const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(writeRange)}?valueInputOption=RAW`;
+	const writeRes = await fetch(writeUrl, {
+		method: "PUT",
 		headers: {
 			Authorization: `Bearer ${token}`,
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({
-			range,
+			range: writeRange,
 			majorDimension: "ROWS",
 			values: [row],
 		}),
 	});
-	if (!res.ok) {
-		throw new HttpError(502, `Task append failed: ${res.status} ${await res.text()}`);
+	if (!writeRes.ok) {
+		throw new HttpError(502, `Task append failed: ${writeRes.status} ${await writeRes.text()}`);
 	}
 }
 

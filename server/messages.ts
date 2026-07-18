@@ -20,6 +20,7 @@ export const MSG = {
 	errTaskAlreadyDeleted: "この課題はすでに削除済みです",
 	errTaskTitleMissing: "タスク名を入力してください",
 	errTaskTitleTooLong: "タスク名は {max} 文字以内で入力してください",
+	errTaskCategoryMissing: "分類を入力してください",
 	errTaskCategoryTooLong: "分類は {max} 文字以内で入力してください",
 	errInvalidAmount: "金額が不正です",
 	errInvalidExpiryDate: "期限の日付形式が不正です",
