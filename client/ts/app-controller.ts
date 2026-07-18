@@ -311,9 +311,10 @@
     async function selectParentUser(shouldToast: boolean) {
       state.pendingParentSwitchToast = shouldToast;
       ensureSelectedUserForParentMode();
+      // Close the user selection immediately so parent switch feels responsive.
+      hideUserSelection();
       const autoLoggedIn = await tryAutoLoginParent();
       if (autoLoggedIn) {
-        hideUserSelection();
         if (shouldToast) actions.toast(tr('users.switchedParentToast'), 'success');
         state.pendingParentSwitchToast = false;
         return;
