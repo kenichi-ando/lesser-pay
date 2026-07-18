@@ -200,6 +200,17 @@
     </div>
   </dialog>
 
+  <dialog id="confirm-modal" class="modal hidden" aria-modal="true">
+    <div class="modal-content">
+      <svg class="modal-mascot" width="64" height="64"><use href="#lesser-panda"/></svg>
+      <p id="confirm-message" class="modal-desc"></p>
+      <div class="modal-actions">
+        <button id="confirm-cancel-btn" class="btn btn-secondary" type="button"></button>
+        <button id="confirm-ok-btn" class="btn btn-primary" type="button"></button>
+      </div>
+    </div>
+  </dialog>
+
   <output id="toast" class="toast hidden" aria-live="polite"></output>
 
   <script src="js/config.js"></script>

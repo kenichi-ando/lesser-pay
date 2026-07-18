@@ -169,6 +169,7 @@ function getInviteModalElements(modal: HTMLElement): {
     const setStatus = deps.setStatus;
     const withBusy = deps.withBusy;
     let pushSubscribed = false;
+    let loadDataSeq = 0;
 
     let dataCache: { ts: number; tasks: LPTask[]; history: LPHistoryItem[] } | null = null;
 
@@ -650,32 +651,43 @@ function getInviteModalElements(modal: HTMLElement): {
       ui.panel.classList.remove('hidden');
     }
 
+    function applyLoadDataCacheResult(force: boolean, now: number): boolean {
+      if (force || !dataCache) return false;
+      if (now - dataCache.ts >= CONFIG.CACHE_TTL_SEC * 1000) return false;
+      applyCachedData(dataCache);
+      runtime.render();
+      return true;
+    }
+
+    function applyLoadDataNetworkResult(now: number, data: SharedApiSuccess<'getData'>): void {
+      const nextTasks = data.tasks || [];
+      const approvedIds = detectNewlyApproved(nextTasks);
+      applyFetchedData(now, nextTasks, data.history || []);
+      persistSubmittedSnapshot(nextTasks);
+      if (approvedIds.length > 0 && deps.onTasksApproved) {
+        // Defer until after render so the balance/logo elements are in the DOM.
+        setTimeout(function () { deps.onTasksApproved(approvedIds); }, 0);
+      }
+    }
+
     async function loadData(force: boolean) {
+      loadDataSeq++;
       const forced = !!force;
       if (!state.booted || !state.user) return;
       const now = Date.now();
-      if (!forced && dataCache && now - dataCache.ts < CONFIG.CACHE_TTL_SEC * 1000) {
-        applyCachedData(dataCache);
-        await refreshPushSubscriptionRole();
-        runtime.render();
+      if (applyLoadDataCacheResult(forced, now)) {
         return;
       }
-      setLoadingState(true);
+      const showLoadingState = state.tasks.length === 0 && state.history.length === 0;
+      if (showLoadingState) setLoadingState(true);
       try {
         const data = await api('getData');
-        const nextTasks = data.tasks || [];
-        const approvedIds = detectNewlyApproved(nextTasks);
-        applyFetchedData(now, nextTasks, data.history || []);
-        persistSubmittedSnapshot(nextTasks);
-        await refreshPushSubscriptionRole();
-        if (approvedIds.length > 0 && deps.onTasksApproved) {
-          // Defer until after render so the balance/logo elements are in the DOM.
-          setTimeout(function () { deps.onTasksApproved(approvedIds); }, 0);
-        }
+        applyLoadDataNetworkResult(now, data);
       } catch (err) {
         if (handleControllerError(err)) return;
       } finally {
-        setLoadingState(false);
+        if (showLoadingState) setLoadingState(false);
+        else runtime.render();
       }
     }
 

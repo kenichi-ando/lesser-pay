@@ -7,7 +7,7 @@ type ApiPayloadValue = string | number | null;
 type State = Pick<LPAppState, "parentPin" | "tasks" | "history" | "parentMode" | "user">;
 type Elements = Pick<
   LPElements,
-  "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertDelete" | "taskUpsertSubmit" | "taskUpsertError"
+  "toast" | "cashoutAmount" | "cashoutMemo" | "cashoutBalance" | "cashoutError" | "cashoutModal" | "cashoutSubmit" | "bonusLabel" | "bonusAmount" | "bonusError" | "bonusModal" | "bonusSubmit" | "taskUpsertModal" | "taskUpsertTitle" | "taskUpsertDesc" | "taskCategorySelect" | "taskCategoryCustom" | "taskTitleInput" | "taskPointsInput" | "taskExpiryInput" | "taskUpsertDelete" | "taskUpsertSubmit" | "taskUpsertError" | "confirmModal" | "confirmMessage" | "confirmCancel" | "confirmOk"
 >;
 type Translator = LPTranslator;
 type BusyTarget = LPBusyTarget;
@@ -238,6 +238,38 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
     let cashoutSubmitting = false;
     let bonusSubmitting = false;
     const taskActionInFlight = new Set<string>();
+    let confirmResolver: ((answer: boolean) => void) | null = null;
+
+    function setupConfirmHandlers(): void {
+      els.confirmCancel.textContent = tr('confirm.no');
+      els.confirmOk.textContent = tr('confirm.yes');
+      els.confirmCancel.addEventListener('click', function () { settleConfirm(false); });
+      els.confirmOk.addEventListener('click', function () { settleConfirm(true); });
+      els.confirmModal.addEventListener('click', function (event) {
+        if (event.target === els.confirmModal) settleConfirm(false);
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        if (els.confirmModal.classList.contains('hidden')) return;
+        settleConfirm(false);
+      });
+    }
+
+    function settleConfirm(answer: boolean): void {
+      const resolver = confirmResolver;
+      confirmResolver = null;
+      els.confirmModal.classList.add('hidden');
+      if (resolver) resolver(answer);
+    }
+
+    function askConfirm(message: string): Promise<boolean> {
+      if (confirmResolver) return Promise.resolve(false);
+      els.confirmMessage.textContent = message;
+      els.confirmModal.classList.remove('hidden');
+      return new Promise(function (resolve) {
+        confirmResolver = resolve;
+      });
+    }
 
     function getTaskById(id: string): LPTask | null {
       const target = String(id);
@@ -400,7 +432,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
     async function runTaskAction(btn: HTMLElement, id: string, config: TaskActionConfig): Promise<void> {
       const flightKey = id + ':' + config.apiAction;
       if (taskActionInFlight.has(flightKey)) return;
-      if (!confirm(tr(config.confirmKey))) return;
+      if (!await askConfirm(tr(config.confirmKey))) return;
       taskActionInFlight.add(flightKey);
       try {
         await withBusy(taskButtons(id), { label: tr('tasks.processing'), labelNode: btn }, async function () {
@@ -539,7 +571,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
     async function deleteTaskFromUpsert(): Promise<void> {
       if (taskDeleteSubmitting) return;
       if (taskUpsertMode !== 'edit' || !editingTaskId) return;
-      if (!confirm(tr('taskForm.confirmDelete'))) return;
+      if (!await askConfirm(tr('taskForm.confirmDelete'))) return;
       taskDeleteSubmitting = true;
       hideFormModal(els.taskUpsertModal, els.taskUpsertError);
       try {
@@ -616,7 +648,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
         failWithError(els.cashoutError, tr('cashout.insufficient', { total: total }));
         return;
       }
-      if (!confirm(tr('cashout.confirm', { amount: amount }))) return;
+      if (!await askConfirm(tr('cashout.confirm', { amount: amount }))) return;
       hideFormModal(els.cashoutModal, els.cashoutError);
       cashoutSubmitting = true;
       try {
@@ -660,7 +692,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
         failWithError(els.bonusError, tr('bonus.invalidAmount'));
         return;
       }
-      if (!confirm(tr('bonus.confirm', { label: label, amount: amount }))) return;
+      if (!await askConfirm(tr('bonus.confirm', { label: label, amount: amount }))) return;
       hideFormModal(els.bonusModal, els.bonusError);
       bonusSubmitting = true;
       try {
@@ -699,6 +731,7 @@ function hideFormModal(modal: HTMLElement, error: HTMLElement): void {
       toggleTaskCategoryCustomField(showCustom);
       if (showCustom) focusSoon(els.taskCategoryCustom);
     });
+    setupConfirmHandlers();
 
     return {
       toast: toast,

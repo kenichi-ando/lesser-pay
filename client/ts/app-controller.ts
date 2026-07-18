@@ -370,6 +370,7 @@
         actions.toast(tr(opts.toastKey || 'users.switchedToast', { name: labelOf(key) }), 'success');
       }
       try {
+        await data.refreshPushSubscriptionRole();
         await data.loadData(true);
       } finally {
         switchingUser = false;

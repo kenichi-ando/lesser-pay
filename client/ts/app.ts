@@ -87,6 +87,10 @@
     taskUpsertSubmit: mustElement('task-upsert-submit-btn'),
     taskUpsertCancel: mustElement('task-upsert-cancel-btn'),
     taskUpsertError: mustElement('task-upsert-error'),
+    confirmModal: mustElement('confirm-modal'),
+    confirmMessage: mustElement('confirm-message'),
+    confirmCancel: mustElement('confirm-cancel-btn'),
+    confirmOk: mustElement('confirm-ok-btn'),
     settingsModal: mustElement('settings-modal'),
     settingsClose: document.getElementById('settings-close-btn'),
     settingsPushRow: document.getElementById('settings-push-row') as HTMLButtonElement | null,
@@ -147,6 +151,7 @@
       !els.cashoutModal.classList.contains('hidden') ||
       !els.bonusModal.classList.contains('hidden') ||
       !els.taskUpsertModal.classList.contains('hidden') ||
+      !els.confirmModal.classList.contains('hidden') ||
       !els.settingsModal.classList.contains('hidden') ||
       !els.userSelectScreen.classList.contains('hidden')
     );

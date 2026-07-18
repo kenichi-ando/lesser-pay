@@ -142,6 +142,7 @@ const STRINGS = {
     switchedParentToast: '保護者でログインしました'
   },
   settings: { open: '設定を開く', title: '⚙️ 設定', desc: 'お知らせと音を切り替えできます', notifications: 'お知らせ', sound: '効果音', close: '閉じる' },
+  confirm: { yes: 'はい', no: 'いいえ' },
   push: { unsupported: 'この端末では通知に未対応です', denied: '通知がブロックされています。ブラウザ設定で許可してください', enabledToast: '通知を有効化しました', disabledToast: '通知を無効化しました', failed: '通知の設定に失敗しました' },
   time: { hourAndMinute: '{h}時間{m}分', hour: '{h}時間', minute: '{m}分' },
   errors: { network: '通信エラー', unknown: '不明なエラー' }
