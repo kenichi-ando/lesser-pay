@@ -113,13 +113,13 @@ const STRINGS = {
     desc: '理由とポイントを入力してください',
     labelPlaceholder: '理由（例: テストがんばった）',
     pointsPlaceholder: 'ポイント（例: 100）',
-    submit: '付与',
+    submit: 'あげる',
     processing: '処理中…',
     cancel: 'キャンセル',
     invalidLabel: '理由を入力してください',
     invalidAmount: '正しい数値を入力してください',
-    confirm: '「{label}」に {amount} pt を付与します。よろしいですか？',
-    toast: '🎁 {amount} pt を付与しました'
+    confirm: '「{label}」に {amount} pt をあげます。よろしいですか？',
+    toast: '🎁 {amount} pt をあげました'
   },
   setup: { needUsers: 'USERS シークレット (wrangler secret put USERS) を設定してください' },
   locked: {
