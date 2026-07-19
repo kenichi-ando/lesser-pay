@@ -70,7 +70,7 @@ const STRINGS = {
     descCreateParent: '子どものタスクを追加しよう',
     descEdit: 'タスク内容を更新します',
     category: '分類',
-    categoryOther: 'その他',
+    categoryOther: '＋ 新しい分類',
     categoryCustomPlaceholder: '分類を入力（例: お手伝い）',
     titleLabel: 'タスク名',
     titlePlaceholder: 'タスク名（例: テスト対策）',
