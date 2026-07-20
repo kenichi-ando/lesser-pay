@@ -209,6 +209,7 @@ synchronous. Changes require `wrangler secret put …` + `npm run deploy`.
 | `API_TOKEN`           | ✅   | Long opaque bearer token (~256 bits) returned by `redeemInvite`. Sent as `Authorization: Bearer …` on every other `/api` call. Verified with `constantTimeEqual`. |
 | `PARENT_PIN`          | ✅   | Parent-mode PIN. Verified on approve / reject / cashout. |
 | `USERS`               | ✅   | Comma-separated `key:label` pairs. `key` is the sheet-name suffix (`Tasks_<key>` / `History_<key>`); `label` is an optional display name (defaults to `key`). |
+| `DEBUG`               | ⬜ | Optional roster toggle. `"1"` appends `Debug User`; `"0"` or unset disables it. |
 | `PUSH_VAPID_PUBLIC_KEY`  | ⬜ | VAPID public key (P-256 uncompressed point, base64url). Push is skipped if unset. |
 | `PUSH_VAPID_PRIVATE_KEY` | ⬜ | VAPID private key (`d` JWK component, base64url). Required if public key is set. |
 | `PUSH_SUBJECT`           | ⬜ | Contact identifier in the VAPID JWT `sub` claim. `mailto:you@yourdomain.com` style. APNs rejects clearly fake values. |
@@ -396,7 +397,7 @@ columns in whatever language they prefer without affecting behaviour.
   (`crypto.subtle.sign` with RS256). Also `casTaskStatus` (the optimistic-lock
   primitive) and the row shaping for the frontend.
 - `config.ts` — `fetchConfig` reads runtime config (`PARENT_PIN`, `USERS`)
-  from `env`. Synchronous; the parsed `USERS` JSON is cached per isolate.
+  from `env`. Synchronous; the parsed `USERS` roster string is cached per isolate.
   `checkPin` is the only auth gate.
 - `schema.ts` — column indexes, status values, sheet name prefixes.
 - `notify.ts` — Notification fan-out (delegates to `push.ts`). Best effort;
@@ -582,7 +583,7 @@ When reviewing a PR, the things most likely to be wrong:
    it, two concurrent requests can both pass the read-side validation and
    produce a lost update.
 6. New side effects added on the frontend instead of in the Worker. Move them.
-7. The user roster is server-managed via the `USERS` wrangler secret (JSON).
+7. The user roster is server-managed via the `USERS` wrangler secret.
    If you find code that adds or deletes users from the client side, that is
    a regression — the roster is intentionally read-only on the frontend.
 8. Push regressions: any change to `sendWebPush` that drops the body or the

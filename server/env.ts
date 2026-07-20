@@ -22,6 +22,9 @@ export interface Env {
 	// Comma-separated key:label pairs for the user roster, e.g.
 	//   "Light:Light, Tiara:Tiara"
 	USERS: string;
+	// Optional debug switch.
+	// "1" => append Debug user to roster, "0"/unset => disabled.
+	DEBUG?: string;
 	// Optional: VAPID key pair for Web Push (PWA notifications).
 	// Unset → push notifications are skipped.
 	PUSH_VAPID_PUBLIC_KEY?: string;
@@ -29,10 +32,5 @@ export interface Env {
 	// Optional: contact URL in VAPID JWT `sub` claim.
 	// Example: "mailto:you@example.com"
 	PUSH_SUBJECT?: string;
-	// Optional: enables debug mode when non-empty.
-	// - Appends a "Debug User" to the USERS roster.
-	// - Apply notifications from Debug user go only to this parent endpoint.
-	// Empty / unset => debug mode disabled.
-	DEBUG_ENDPOINT?: string;
 	ASSETS: Fetcher;
 }

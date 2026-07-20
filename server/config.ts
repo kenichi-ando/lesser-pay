@@ -24,9 +24,6 @@ export interface Config {
 	users: User[];
 }
 
-// When env.DEBUG_ENDPOINT is non-empty, this user is appended to the USERS
-// roster. Kept English-only on purpose — it's an operator-facing test account,
-// not a child.
 export const DEBUG_USER_KEY = "Debug";
 const DEBUG_USER_LABEL = "Debug User";
 
@@ -53,7 +50,7 @@ function parseUsers(raw: string): User[] {
 
 export function fetchConfig(env: Env): Config {
 	const base = parseUsers(env.USERS ?? "");
-	const debugEnabled = String(env.DEBUG_ENDPOINT ?? "").trim().length > 0;
+	const debugEnabled = String(env.DEBUG ?? "").trim() === "1";
 	const users =
 		debugEnabled && !base.some((u) => u.key === DEBUG_USER_KEY)
 			? [...base, { key: DEBUG_USER_KEY, label: DEBUG_USER_LABEL }]

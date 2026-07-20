@@ -1,285 +1,166 @@
 # LesserPay (レサペイ)
 
-家庭内報酬管理アプリ。子どもが日々の目標を達成 → スマホから完了報告 → 親が承認 → **レッサーポイント (単位 `pt`)** が貯まる → 親がポイントを使う（お小遣い化など）一連の流れを、Cloudflare Workers + Google スプレッドシートで運用します。テストの結果が良かったときなど、課題と関係なく親が任意のポイントを付与できる「ボーナス」機能もあります。
+家庭向けポイント管理アプリです。  
+この README は「初めて運用する人が、同じ構成を立ち上げるための手順書」です。  
+技術仕様や内部設計は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
 
-**1端末1人運用**: 1つのスプレッドシートを家族で共用し、子ごとにシートを分けます。各端末は自分のシート名だけを覚えていて、その分のデータしか触れません。GitHubに置くコードには個人情報は一切含まれません。
-
-## 構成
-
-```
-lesser-pay/
-├── server/                # Cloudflare Worker (TypeScript, API)
-│   ├── index.ts           # ルーティング (/api 以外は静的アセットへ)
-│   ├── actions.ts         # アクションテーブル + ハンドラ
-│   ├── api.ts             # Sheets API v4 + Google OAuth (JWT)
-│   ├── config.ts          # 環境変数 (wrangler secret) → Config
-│   ├── schema.ts          # 課題/履歴シートのスキーマ
-│   ├── messages.ts        # サーバから返す文言
-│   ├── notify.ts          # 通知ファンアウト (Web Push)
-│   ├── push.ts            # Web Push (VAPID + RFC 8291 aes128gcm)
-│   ├── env.ts             # Worker bindings
-│   └── util.ts
-├── client/                # フロント一式 (Worker が同オリジンで配信)
-│   ├── index.html
-│   ├── manifest.webmanifest
-│   ├── sw.js                          # Service Worker (Web Push + バッジ管理)
-│   ├── icons/                         # PWA / favicon アイコン
-│   ├── css/style.css
-│   └── ts/
-│       ├── config.ts                  # localStorage キー定義のみ (個人情報なし)
-│       ├── strings.ts                 # 画面文言 (i18n)
-│       ├── app-i18n.ts                # tr/applyI18n
-│       ├── app-store.ts               # localStorage ラッパ
-│       ├── app-utils.ts               # 日付/表示ユーティリティ
-│       ├── app-render.ts              # 描画専用レイヤ
-│       ├── app-controller-data.ts     # API通信/boot/loadData
-│       ├── app-controller-actions.ts  # タスク操作/キャッシュアウト/toast
-│       ├── app-controller.ts          # ユーザー切替/親モードUIの制御
-│       └── app.ts                     # 依存注入とイベント配線（オーケストレーター）
-└── wrangler.jsonc         # Worker 設定 (静的アセットバインディング含む)
-```
-
-API と SPA を同じ Worker (同一オリジン) で配信するため、フロントは `/api` を相対パスで叩くだけ。サーバURLの初期セットアップ画面はありません。
-
-設定値はすべて `wrangler secret` で管理します。スプレッドシートはユーザデータ (課題と履歴) 専用で、設定シートはありません。
-
-## セットアップ
-
-### 0. Cloudflare アカウントと wrangler
-
-[Cloudflare](https://dash.cloudflare.com/sign-up) で無料アカウントを作成し、ローカルから wrangler でログインします。
+## 1. リポジトリを取得する
 
 ```bash
-npx wrangler login   # ブラウザが開いて Cloudflare 認証
+git clone <repo-url>
+cd lesser-pay
 ```
 
-以降の `wrangler secret put` / `wrangler deploy` はこの認証情報を使います。
+## 2. 事前に用意するもの
 
-### 1. スプレッドシート作成（家族で1つ）
+- Cloudflare アカウント
+- Google アカウント
+- Node.js 18 以上
+- 家族で使う Google スプレッドシート 1つ
 
-1. 新しい Google スプレッドシートを作成（例: `LesserPay`）
-2. シートID（URL の `/d/` と `/edit` の間）を控える
-3. 子ごとに `Tasks_<子の名前>` と `History_<子の名前>` の2シート(タブ)を作る — タブ名の大文字小文字は完全一致が必要です (例: `Tasks_Light`, `History_Light`)
+Cloudflare へログイン:
 
-#### 課題シート (`Tasks_<子の名前>`)
+```bash
+npx wrangler login
+```
 
-A列から順に **ID / ステータス / 分類 / タスク名 / 提出ポイント / 完了ポイント / 期限** の7列。1行目のヘッダ文字列は自由 (コードは1行目を読まずに2行目以降をデータとして扱います)。日本語のままでも英語でも構いません。
+## 3. スプレッドシートを準備する
 
-| 列 | 内容 | 空欄でOK? |
-|----|----|----|
-| A | ID | ✅ (初回読み込みで `T<unix>_<rand>` 自動採番) |
-| B | ステータス (`Pending` / `Requested` / `Submitted` / `Returned` / `Approved` / `Deleted`) | ✅ (空 = `Pending`) |
-| C | 分類 — 同じ値を持つ課題どうしを画面上でグループ化する見出し (例: `お手伝い`, `運動`) | ⚠️ アプリ操作では必須（手入力時は空可、空は `その他` 扱い） |
-| D | タスク名 | ❌ 必須 |
-| E | 提出ポイント (現行運用では基本 `0`) | ✅ (0扱い) |
-| F | 完了ポイント (親の承認時に加算) | ✅ (0扱い) |
-| G | 期限 `YYYY/MM/DD` | ✅ (空 = 無期限) |
+1つのスプレッドシートを作成し、子どもごとに以下 2 タブを作成します。
 
-#### 履歴シート (`History_<子の名前>`)
+- `Tasks_<key>` 例: `Tasks_Light`
+- `History_<key>` 例: `History_Light`
 
-A列から順に **日時 / 内容 / ポイント (pt)** の3列。1行目のヘッダ文字列は自由。アプリ側が自動で書き込みます。手書きで足したい場合は同じ列構成に揃えてください。
+`Tasks_<key>` は A〜G 列で以下の順番にしてください:
 
-### 2. Google Cloud Service Account を発行
+- A: ID
+- B: Status
+- C: Category
+- D: Title
+- E: SubmitReward
+- F: CompleteReward
+- G: Expiry (`YYYY/MM/DD`)
 
-Worker は Sheets API v4 を Service Account で叩きます。
+`History_<key>` は A〜C 列で以下の順番にしてください:
 
-1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作成 (既存でも可)
-2. **APIとサービス → ライブラリ** で「Google Sheets API」を有効化
-3. **IAMと管理 → サービスアカウント** で新規作成 → キーを追加 → JSON をダウンロード
-4. JSON 内の `client_email` をコピーして、対象スプレッドシートを **その Service Account メールアドレスに「編集者」で共有**
+- A: Date
+- B: Content
+- C: Points
 
-### 3. Cloudflare Worker をデプロイ
+ヘッダ行 (1行目) の文字は自由です。列順だけ合わせてください。
 
-`wrangler.jsonc` の `"name"` を自分が使いたい Worker 名に変更します (デフォルトは `lesser-pay`)。これがそのままデプロイURLのサブドメインになります (例: `"happy-coins"` → `https://happy-coins.<account>.workers.dev/`)。
+## 4. Google Service Account を作成する
+
+1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクト作成
+2. 「Google Sheets API」を有効化
+3. Service Account を作成し、JSON キーをダウンロード
+4. JSON 内の `client_email` を、上記スプレッドシートへ「編集者」で共有
+
+## 5. Secret を登録する（必須 / 任意）
+
+まず `npm install` を実行します。
 
 ```bash
 npm install
+```
 
-# シークレット登録 (一度だけ)
-npx wrangler secret put GOOGLE_CLIENT_EMAIL   # Service Account の client_email
-npx wrangler secret put GOOGLE_PRIVATE_KEY    # Service Account JSON の private_key (-----BEGIN/END PRIVATE KEY----- 含む)
-npx wrangler secret put GOOGLE_SHEET_ID              # 対象スプレッドシートID
-npx wrangler secret put INVITE_CODE           # 招待コード (6文字 / A-Z, 0-9。下の「`INVITE_CODE` / `API_TOKEN`」セクション参照)
-npx wrangler secret put API_TOKEN             # /api 認証用の長いトークン (43文字目安。下の同セクション参照)
-npx wrangler secret put PARENT_PIN            # 保護者モードの暗証番号
-npx wrangler secret put USERS                 # 子の一覧 (JSON, 下記参照)
+### 必須 Secret
 
-# デプロイ
+```bash
+npx wrangler secret put GOOGLE_CLIENT_EMAIL
+npx wrangler secret put GOOGLE_PRIVATE_KEY
+npx wrangler secret put GOOGLE_SHEET_ID
+npx wrangler secret put INVITE_CODE
+npx wrangler secret put API_TOKEN
+npx wrangler secret put PARENT_PIN
+npx wrangler secret put USERS
+```
+
+### 任意 Secret
+
+```bash
+# Debugユーザー表示切替: 1=有効, 0/未設定=無効
+npx wrangler secret put DEBUG
+
+# 通知を使う場合のみ（VAPID）
+npx wrangler secret put PUSH_VAPID_PUBLIC_KEY
+npx wrangler secret put PUSH_VAPID_PRIVATE_KEY
+npx wrangler secret put PUSH_SUBJECT
+```
+
+`USERS` は `key:label` のカンマ区切りです（例: `Light:ライト, Tiara:ティアラ`）。
+`DEBUG` は `1` のときだけ `Debug User` を追加表示します。
+
+## 6. デプロイする
+
+```bash
 npm run deploy
 ```
 
-`npm run deploy` の出力末尾に `Deployed <worker-name> triggers (...) https://<worker-name>.<account>.workers.dev` のようにURLが表示されます。これがアプリのトップURLです。後から確認するときは Cloudflare ダッシュボード → Workers & Pages からも見られます。
+デプロイ後に表示される `https://<worker-name>.<account>.workers.dev` がアプリ URL です。
 
-#### `USERS` の形式
+## 7. 招待コードとトークンを作る
 
-`USERS` は `key:label` の組をカンマ区切りで並べた文字列です。例:
-
-```
-Light:ライト, Tiara:ティアラ
-```
-
-`key` に `Light` を指定すると、対応するシート(タブ)名は `Tasks_Light` / `History_Light` です。`label` を省略するとキーがそのまま表示されます (例: `Light, Tiara` だけでもOK)。`:` の前後・カンマの前後の空白は自動で trim されます。
-
-子の追加・改名は `wrangler secret put USERS` で値を更新 → 子用シートを準備、で反映されます (secret 更新だけならデプロイ不要)。
-
-#### `INVITE_CODE` / `API_TOKEN`
-
-認証は **2段構え** にしています:
-
-- **`INVITE_CODE`** — 家族にだけ伝える短い合言葉 (**6文字 / A-Z + 0-9**)。アプリ初回起動時のロック画面で1回だけ手入力します。サーバが照合 OK なら `API_TOKEN` をクライアントに返します。
-- **`API_TOKEN`** — `/api` への全リクエストで `Authorization: Bearer <token>` として送られる長い乱数 (**43文字目安、~256bit**)。クライアントは `localStorage` に保存し以降の API 呼び出しで使います。**家族に直接伝える値ではありません。**
-
-短い招待コードを直接 API 認証に使わないのは、6文字 (≈21億通り) では `/api` への総当たり攻撃に対して長期的には不十分だからです。`API_TOKEN` を別 secret にすることで、API 認証は事実上ブルートフォース不可能 (~256bit) にしつつ、家族に渡す合言葉は 6文字に短縮しています。
+- `INVITE_CODE`: 家族に渡す 6 文字コード (`A-Z0-9`)
+- `API_TOKEN`: API 用の長いトークン（目安 43 文字）
 
 生成例:
 
 ```bash
-# INVITE_CODE (6文字 [A-Z0-9])
 LC_ALL=C tr -dc 'A-Z0-9' </dev/urandom | head -c 6 ; echo
-# → 例: K7QXZ4
-
-# API_TOKEN (43文字、~256bit)
 LC_ALL=C tr -dc 'A-Za-z0-9_-' </dev/urandom | head -c 43 ; echo
-# → 例: a8Kx9_QmZ-tR4vNpBhCsLuEwJfY2DgHjT6VnXkM3PqA
 ```
 
-デプロイ後、家族にはアプリ URL とこの **6文字の招待コードだけ** を別々に伝えます (`API_TOKEN` は家族に渡しません)。家族は URL を開くと「招待コードを入力」画面が出るので、そこに 6文字を入力するとアプリが使えるようになります。入力は小文字で打ってもアプリ側で自動で大文字に変換されます。
+## 8. 通知を使う場合（任意）
 
-招待コード/トークンを更新したいとき:
-
-- **招待コードのみ更新** (家族以外に漏れた疑い): `wrangler secret put INVITE_CODE` で新値 → 再デプロイ。既存の家族端末は `API_TOKEN` を持っているので影響なし。新規追加端末は新しい招待コードで入る
-- **API_TOKEN も更新** (より強い無効化): `wrangler secret put API_TOKEN` で新値 → 再デプロイ。**全端末で `localStorage` がリセットされ、家族全員が招待コードを再入力する必要があります**
-
-ヘッダーの **ユーザ名チップ** をタップすると `USERS` に登録した子の一覧がドロップダウンで開き、ワンタッチで切り替えられます。
-
-### 4. プッシュ通知の有効化 (管理者作業)
-
-通知は VAPID 鍵をサーバに登録すると有効になります。**未設定でもアプリは動きますが、通知ボタン自体が表示されません**。家族のホーム画面追加 (次ステップ) より先に済ませてください。
-
-1. VAPID キーペアを生成
+通知を有効化する場合のみ、VAPID キーを生成し、上の「任意 Secret」に登録します。
 
 ```bash
 npx web-push generate-vapid-keys
-```
-
-2. 以下を `wrangler secret` に登録して再デプロイ
-
-```bash
-npx wrangler secret put PUSH_VAPID_PUBLIC_KEY
-npx wrangler secret put PUSH_VAPID_PRIVATE_KEY
-npx wrangler secret put PUSH_SUBJECT    # 例: mailto:you@example.com (実在のメアド推奨。Apple は example.com 等の架空ドメインを拒否)
 npm run deploy
 ```
 
-VAPID 鍵を後から差し替えた場合、過去の鍵で購読していた端末への送信は失敗し続けます。スプレッドシートの `PushSubscriptions` シートのデータ行を全削除し、各端末で通知ボタンをオフ→オンして購読し直してください。
+## 9. 家族端末の初期設定
 
-サーバ側は RFC 8291 (aes128gcm) で `{title, body}` を暗号化したペイロードを送ります。Service Worker (`client/sw.js`) は通知受信ごとにバッジ件数を IndexedDB にインクリメント保持し、アプリをフォアグラウンドにすると自動でクリアされます。
-
-#### `PushSubscriptions` シート仕様
-
-`PushSubscriptions` は次の **8列固定** です（列名ではなく列順で判定）。
-
-`endpoint | p256dh | auth | user | role | deviceLabel | createdAt | updatedAt`
-
-- `role=parent` で保存するとき、`user` は空文字で保存します（親モード中の表示ユーザー切替で不整合を起こさないため）
-- `deviceLabel` は端末識別用の表示ラベルです（例: `iPhone / iOS / Safari`）
-- サーバは新規行追加時に `A:H` の次行へ直接 `PUT` するため、Sheets の `append` による列ずれ（例: G:N へ書き込まれる問題）を回避しています
-- 既存シートを移行する場合は、まず `PushSubscriptions` の実データを `A:H` に揃えてください
-
-#### 期限リマインド通知 (自動)
-
-- 毎日 **9:00 JST** に Cron (`0 0 * * *` in UTC) が動きます
-- 各ユーザーの `Tasks_<user>` を見て、**期限が明日** かつ未完了（`Approved` 以外）のタスクを抽出します
-- 子ども本人 (`role=child`) と保護者端末 (`role=parent`) の両方に通知します
-- 二重送信防止のため `DeadlineReminders` シートを自動作成し、当日送信済みタスクを記録します
-
-#### DEBUGモード (`DEBUG_ENDPOINT`)
-
-`DEBUG_ENDPOINT` secret に値を入れると DEBUG モードが有効になります。
-
-- `Debug` ユーザーがユーザー一覧に追加される
-- `Debug` ユーザーの完了報告通知は、`DEBUG_ENDPOINT` と一致する親端末にだけ送信される
-- 子ども向け通知（承認・訂正依頼・ポイント消費・ボーナス）は通常どおり
-
-`DEBUG_ENDPOINT` が未設定 / 空文字なら DEBUG モードは無効です。
-
-## 家族向け：PWA としてホーム画面に追加 (必須)
-
-LesserPay は **PWA としてホーム画面から起動することを前提に作っています**。とくに iOS は PWA としてインストールしないとプッシュ通知が一切届きません。Android も PWA で起動したほうがブラウザのアドレスバー等が消えてアプリらしい見た目になります。
-
-家族には **アプリ URL と 6文字の招待コード** を伝え、必ず以下のいずれかの手順で **ホーム画面に追加 → ホーム画面アイコンから起動 → 招待コードを入力** してください。
-
-### iPhone / iPad (iOS 16.4 以降)
-
-1. **Safari** でアプリ URL を開く (Chrome / Firefox iOS版では PWA インストール不可)
-2. 画面下の共有ボタン (□↑) → 「ホーム画面に追加」 → 「追加」
-3. **ホーム画面のアプリアイコンから起動** (Safari のタブから開くと通知が動きません)
-4. 「アクセスできません」画面で **招待コード (6文字)** を入力
-5. ヘッダー右上のユーザー名チップ → 「⚙️ 設定」 → 「🔔 通知」をオン → 通知許可ダイアログで「許可」
-
-### Android (Chrome)
-
-1. **Chrome** でアプリ URL を開く
-2. アドレスバー右の「︙」メニュー → 「アプリをインストール」または「ホーム画面に追加」
-3. ホーム画面のアプリアイコンから起動
-4. 「アクセスできません」画面で **招待コード (6文字)** を入力
-5. ヘッダー右上のユーザー名チップ → 「⚙️ 設定」 → 「🔔 通知」をオン → 通知許可ダイアログで「許可」
-
-### PC (Chrome / Edge)
+各端末で:
 
 1. アプリ URL を開く
-2. アドレスバー右端のインストールアイコン (⊕ 状) をクリック → 「インストール」
-3. デスクトップ / スタートメニューから起動
-4. 「アクセスできません」画面で **招待コード (6文字)** を入力
-5. ヘッダー右上のユーザー名チップ → 「⚙️ 設定」 → 「🔔 通知」をオン → ブラウザの通知許可ダイアログで「許可」
+2. PWA としてホーム画面に追加（特に iOS は必須）
+3. ホーム画面アイコンから起動
+4. 招待コード (6文字) を入力
+5. 必要なら通知を ON
 
-> PC は PWA インストールしなくてもブラウザ通知が動きますが、タブを閉じていると届かないので、家族で揃えるためにもインストール推奨です。
+## 10. 日常運用
 
-### 通知が来ない時のチェックリスト
+- 親: タスク追加、承認、ポイント消費、ボーナス付与
+- 子: タスク提案、完了報告
+- ユーザー追加/改名時:
+  - `Tasks_<key>` / `History_<key>` タブを追加
+  - `USERS` secret を更新
+  - `npm run deploy`
 
-- ホーム画面のアイコンから起動している (ブラウザのタブからではない)
-- 「⚙️ 設定」モーダルの「🔔 通知」がオンになっている
-- iOS 設定 → 通知 → LesserPay が「通知を許可」になっている
-- iOS の集中モード／おやすみモードが OFF
-- iOS の場合、バージョンが 16.4 以上である
+## 11. よく使う運用コマンド
 
-それでもダメなら、PWA をホーム画面から削除 → 再インストール → 通知をオン、で購読をやり直してください。それでも直らないときは管理者が `npx wrangler tail` で送信ログを確認します ([ARCHITECTURE.md](./ARCHITECTURE.md) の Web Push セクション参照)。
+```bash
+# Secret 更新
+npx wrangler secret put USERS
+npx wrangler secret put INVITE_CODE
+npx wrangler secret put API_TOKEN
 
-### PC操作の補足
+# 再デプロイ
+npm run deploy
 
-- ダイアログは画面中央に表示されます
-- `Esc` キーで開いているダイアログを閉じられます
+# ログ確認
+npx wrangler tail
+```
 
-## 運用フロー
+## 12. トラブル時の確認ポイント
 
-1. **課題の追加** (親) — 各カテゴリ見出しの右にある丸い `＋` から追加（そのカテゴリで `Pending` 作成）。画面下部の「＋ その他のタスク追加」は分類入力を必須化（例: `お手伝い`）。従来どおりスプレッドシートへ直接追加も可能。A列(ID)とB列(状態)は **空欄でOK**。
-2. **利用者の選択** (起動時/切替時) — 初回は「誰が使う？」画面で子ども or 保護者を選択。保護者を選ぶとパスワード入力（保存済みなら自動ログイン）。
-3. **タスク提案 / 完了報告** (子)
-   - 各カテゴリ見出し右の丸い `＋`（または画面下部「＋ その他のタスク追加」）から新規提案すると状態は `Requested`（UI表示は `申請中`）
-   - 既存タスクの「完了報告」は `Submitted`（UI表示は同じく `申請中`）
-   いずれも通知が有効な保護者端末にプッシュ通知が届く。
-4. **承認 / 編集 / 訂正依頼 / 削除** (親) — ヘッダー右上の**ユーザ名チップ**をタップ → 必要に応じて「ログインユーザーを切り替え」から保護者でログイン → `申請中` の課題に「✓承認」「編集/訂正依頼」。
-   - `Submitted` の承認: 履歴にポイント加算が記録される
-   - `Requested` の承認: タスクが通常タスクとして `Pending` に入る（この時点ではポイント加算なし）
-   - 親モードの編集/削除導線:
-     - **モバイル**: 右スワイプで `編集` ボタン、左スワイプで `削除` ボタンを表示。開いた状態から逆方向へスワイプすると中央へ閉じる
-     - **PC**: タイル左端ホバーで `編集`、右端ホバーで `削除` アイコンを表示（常時表示はしない）
-   - `Pending/Returned/Submitted/Requested/Approved` は編集可能（`Deleted` は編集不可）。
-   - 削除はタイルのゴミ箱アイコンから実行（暗証番号必須）。削除時は行自体は消さず、ステータスを `Deleted` に変更して通常表示から非表示にする。
-5. **表示ユーザーの切替** (親) — 保護者モード中は同じメニューから子どもの表示先をワンタッチ切替（保護者モードは維持）。
-6. **ポイント消費** (親) — 保護者モードで「💸 ポイント消費」→ 金額に加えて任意メモ（使いみち）を入力可能。履歴に `-XXX` で記録。子ども端末に通知。
-7. **ボーナス付与** (親) — 保護者モードで「🎁 ボーナス付与」→ 理由とポイントを入力すると、課題承認フローを経由せず履歴に直接 `+XXX` で記録 (`🎁 <理由>`)。子ども端末に通知。
+- スプレッドシートのタブ名が `Tasks_<key>` / `History_<key>` と完全一致しているか
+- Service Account の `client_email` に編集権限を付けたか
+- `GOOGLE_SHEET_ID` が正しいか
+- 家族がホーム画面アイコンから起動しているか（iOS 通知の重要条件）
 
-## セキュリティ
+---
 
-- **`API_TOKEN` ガード**: `/api` への全リクエスト (招待コード交換以外) は `Authorization: Bearer <API_TOKEN>` が必須。トークンを持たない人は Worker URL を直接開いても、アプリ画面のかわりに「アクセスできません」だけが表示され、子供の名前・履歴・課題は一切取得できない
-- 招待コードは 6文字 (大文字+数字)。家族には URL と別ルート (口頭/メッセージ) で渡す。1度入力すると交換された `API_TOKEN` だけが `localStorage` に保存され、招待コード自体は端末に残らない。URL にも含めないので画面共有・スクショ・ブラウザ履歴経由でも漏れない
-- **`/api` への総当たり耐性は `API_TOKEN` (~256bit) で確保**。短い招待コードはサーバが照合し API_TOKEN を発行する1段目だけに使われる
-- 保護者パスワードは Worker 側のみで検証 (フロントは入力値を `localStorage` に持つだけ)
-- スプレッドシートの共有は **自分 + Service Account のみ**
-- 設定値 (パスワード・トークン・ユーザ一覧) はすべて `wrangler secret` で管理。スプレッドシートに認証情報を書かない
-- リポジトリには個人情報・URL・トークンを含めない
-
-## 開発者向け
-
-設計原則・アーキテクチャ・拡張方法は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください（英語）。
+実装詳細・データモデル・通知の内部仕様は [`ARCHITECTURE.md`](./ARCHITECTURE.md) に集約しています。

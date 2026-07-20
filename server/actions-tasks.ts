@@ -10,7 +10,7 @@ import {
   readHistoryRows,
   updateTaskRow,
 } from "./api";
-import { DEBUG_USER_KEY, checkPin, fetchConfig, labelFor } from "./config";
+import { checkPin, fetchConfig, labelFor } from "./config";
 import { notify } from "./notify";
 import { HttpError, formatDateTime, generateTaskId, toNumber } from "./util";
 
@@ -59,24 +59,10 @@ async function notifyChild(
 
 async function notifyApply(
   env: Env,
-  user: string,
   displayName: string,
   body: string,
 ): Promise<void> {
-  if (user !== DEBUG_USER_KEY) {
-    await notify(env, fmt(MSG.notifySubjectApply, { user: displayName }), body, "parent");
-    return;
-  }
-  const debugEndpoint = String(env.DEBUG_ENDPOINT ?? "").trim();
-  if (!debugEndpoint) return;
-  await notify(
-    env,
-    `[DEBUG] ${fmt(MSG.notifySubjectApply, { user: displayName })}`,
-    body,
-    "parent",
-    undefined,
-    debugEndpoint,
-  );
+  await notify(env, fmt(MSG.notifySubjectApply, { user: displayName }), body, "parent");
 }
 
 function buildApplyNotifyBody(
@@ -96,13 +82,7 @@ function buildApplyNotifyBody(
 async function notifyRequest(env: Env, user: string, displayName: string, taskLabel: string, pt: number) {
   const subject = fmt(MSG.notifySubjectRequest, { user: displayName });
   const body = fmt(MSG.notifyRequestBody, { user: displayName, label: taskLabel, pt });
-  if (user !== DEBUG_USER_KEY) {
-    await notify(env, subject, body, "parent");
-    return;
-  }
-  const debugEndpoint = String(env.DEBUG_ENDPOINT ?? "").trim();
-  if (!debugEndpoint) return;
-  await notify(env, `[DEBUG] ${subject}`, body, "parent", undefined, debugEndpoint);
+  await notify(env, subject, body, "parent");
 }
 
 function parseTaskInput(input: {
@@ -178,7 +158,7 @@ export async function handleApplyTask(env: Env, user: string, taskId: string) {
     completeReward,
     submitReward: isFirstSubmit ? submitReward : 0,
   });
-  await notifyApply(env, user, displayName, notifyBody);
+  await notifyApply(env, displayName, notifyBody);
 
   return { taskId, status: STATUS.SUBMITTED, history };
 }
