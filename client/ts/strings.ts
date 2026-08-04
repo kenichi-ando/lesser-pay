@@ -59,7 +59,7 @@ const STRINGS = {
     expiryLabel: '期限: {date}',
     pendingCount: '{n}件 申請中',
     rewardSubmitOnly: '提出 {submit} pt',
-    rewardCompleteOnly: '完了 {complete} pt',
+    rewardCompleteOnly: '{complete} pt',
     rewardBoth: '提出 {submit} pt・完了 {complete} pt'
   },
   taskForm: {

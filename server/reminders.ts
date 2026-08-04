@@ -57,13 +57,20 @@ function parseDateOnly(value: string): Date | null {
 	return parsed;
 }
 
-function isDueTomorrowJst(expiryRaw: string, now: Date): boolean {
+function daysUntilExpiryJst(expiryRaw: string, now: Date): number | null {
 	const expiry = parseDateOnly(expiryRaw);
-	if (!expiry) return false;
-	const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+	if (!expiry) return null;
 	const e = toJstDateParts(expiry);
-	const t = toJstDateParts(tomorrow);
-	return e.y === t.y && e.m === t.m && e.d === t.d;
+	const t = toJstDateParts(now);
+	const expiryUtc = Date.UTC(e.y, e.m - 1, e.d);
+	const todayUtc = Date.UTC(t.y, t.m - 1, t.d);
+	return Math.floor((expiryUtc - todayUtc) / (24 * 60 * 60 * 1000));
+}
+
+function isDueWithinThreeDaysJst(expiryRaw: string, now: Date): boolean {
+	const daysUntil = daysUntilExpiryJst(expiryRaw, now);
+	if (daysUntil == null) return false;
+	return daysUntil >= 0 && daysUntil <= 3;
 }
 
 function isReminderStatus(status: string): boolean {
@@ -206,7 +213,7 @@ export async function runDeadlineReminders(env: Env, now = new Date()): Promise<
 			const data = await readUserData(env, tasksSheet, historySheet);
 			const candidates = (data.tasks as SharedTask[])
 				.filter((task) => isReminderStatus(task.status))
-				.filter((task) => isDueTomorrowJst(toText(task.expiry), now))
+				.filter((task) => isDueWithinThreeDaysJst(toText(task.expiry), now))
 				.filter((task) => !notifiedSet.has(`${user}::${toText(task.id)}`))
 				.map((task) => ({
 					taskId: toText(task.id),

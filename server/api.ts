@@ -19,6 +19,7 @@ import {
 	HttpError,
 	b64url,
 	b64urlBytes,
+	formatDateTime,
 	generateTaskId,
 	nonEmpty,
 	toDateString,
@@ -164,9 +165,11 @@ function collectAutoFillUpdates(rows: unknown[][], tasksSheet: string): ValueUpd
 		const hasTitle = nonEmpty(r[TASK_COL.TITLE]);
 		const hasId = nonEmpty(r[TASK_COL.ID]);
 		const hasStatus = nonEmpty(r[TASK_COL.STATUS]);
+		const hasUpdatedAt = nonEmpty(r[TASK_COL.UPDATED_AT]);
 		if (!hasTitle) continue;
 
 		const sheetRow = i + 2; // rows start at A2
+		const now = formatDateTime(new Date());
 
 		if (!hasId) {
 			const id = generateTaskId();
@@ -181,6 +184,13 @@ function collectAutoFillUpdates(rows: unknown[][], tasksSheet: string): ValueUpd
 			updates.push({
 				range: `${tasksSheet}!${colLetter(TASK_COL.STATUS + 1)}${sheetRow}`,
 				value: STATUS.PENDING,
+			});
+		}
+		if (!hasUpdatedAt) {
+			r[TASK_COL.UPDATED_AT] = now;
+			updates.push({
+				range: `${tasksSheet}!${colLetter(TASK_COL.UPDATED_AT + 1)}${sheetRow}`,
+				value: now,
 			});
 		}
 	}
@@ -252,21 +262,31 @@ export async function casTaskStatus(
 		throw new HttpError(409, fmt(MSG.errNotAppliedTask, { status: current }));
 	}
 
-	const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(cell)}?valueInputOption=USER_ENTERED`;
+	const updatedAtCell = `${tasksSheet}!${colLetter(TASK_COL.UPDATED_AT + 1)}${rowIndex}`;
+	const now = formatDateTime(new Date());
+	const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values:batchUpdate`;
 	const writeRes = await fetch(writeUrl, {
-		method: "PUT",
+		method: "POST",
 		headers: {
 			Authorization: `Bearer ${token}`,
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({
-			range: cell,
-			majorDimension: "ROWS",
-			values: [[next]],
+			valueInputOption: "USER_ENTERED",
+			data: [
+				{
+					range: cell,
+					values: [[next]],
+				},
+				{
+					range: updatedAtCell,
+					values: [[now]],
+				},
+			],
 		}),
 	});
 	if (!writeRes.ok) {
-		throw new HttpError(502, `STATUS write failed: ${writeRes.status}`);
+		throw new HttpError(502, `STATUS write failed: ${writeRes.status} ${await writeRes.text()}`);
 	}
 }
 
@@ -410,6 +430,7 @@ function shapeTasks(rows: unknown[][]) {
 			completeReward: toNumber(r[TASK_COL.COMPLETE_REWARD]),
 			points: toNumber(r[TASK_COL.COMPLETE_REWARD]), // back-compat: legacy `points`
 			expiry: toDateString(r[TASK_COL.EXPIRY]),
+			updatedAt: toDateTimeString(r[TASK_COL.UPDATED_AT]),
 		}));
 }
 

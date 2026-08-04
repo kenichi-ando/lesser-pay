@@ -46,7 +46,7 @@ export const MSG = {
 	notifyRequestApprovedBody: "{user} のタスク提案「{label}」が承認されました。\nタスク一覧に追加されました。",
 	notifyRejectBody: "{user} の「{label}」が訂正依頼になりました。内容を見直して再提出してください。",
 	notifyCashoutBody: "{user} が {amount} pt を使いました。\n残高: {balance} pt",
-	notifyDeadlineReminderBodyHeader: "{user}の期限が明日のタスクです。",
+	notifyDeadlineReminderBodyHeader: "{user}の期限が3日以内のタスクです。",
 	notifyDeadlineReminderBodyItem: "・{label} ({pt} pt) 期限: {expiry}",
 	notifyDeadlineReminderBodyFooterChild: "明日までに完了報告しよう！",
 	notifyDeadlineReminderBodyFooterParent: "必要なら声かけしてあげてください。",

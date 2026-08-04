@@ -268,6 +268,7 @@ interface LPRendererDeps {
   tr: LPTranslator;
   getStatus: () => LPStatusMap;
   escapeHtml: (value: unknown) => string;
+  parseDate: (source: unknown) => Date | null;
   formatDate: (source: unknown) => string;
   isExpired: (source: unknown) => boolean;
   onTaskAction: (event: Event) => Promise<void>;

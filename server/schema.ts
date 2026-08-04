@@ -59,6 +59,7 @@ export const TASK_SCHEMA = [
 	"SUBMIT_REWARD",
 	"COMPLETE_REWARD",
 	"EXPIRY",
+	"UPDATED_AT",
 ] as const;
 export const TASK_COL = Object.fromEntries(TASK_SCHEMA.map((k, i) => [k, i])) as Record<
 	(typeof TASK_SCHEMA)[number],

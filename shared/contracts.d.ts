@@ -9,6 +9,7 @@ interface SharedTask {
   completeReward: number;
   points: number;
   expiry: string;
+  updatedAt: string;
 }
 
 interface SharedHistoryItem {

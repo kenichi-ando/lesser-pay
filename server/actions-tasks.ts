@@ -284,6 +284,7 @@ export async function handleCreateTask(
   if (role === "parent") checkPin(env, input.pin);
   const parsed = parseTaskInput(input);
   const status = role === "parent" ? STATUS.PENDING : STATUS.REQUESTED;
+  const now = formatDateTime(new Date());
   const task: SharedTask = {
     id: generateTaskId(),
     status,
@@ -293,6 +294,7 @@ export async function handleCreateTask(
     completeReward: parsed.completeReward,
     points: parsed.completeReward,
     expiry: parsed.expiry,
+    updatedAt: now,
   };
   const token = await getAccessToken(env);
   const tasksSheet = taskSheetFor(user);
@@ -304,6 +306,7 @@ export async function handleCreateTask(
     task.submitReward,
     task.completeReward,
     task.expiry,
+    task.updatedAt,
   ]);
   if (role === "child") {
     const displayName = resolveDisplayName(env, user);
@@ -326,12 +329,14 @@ export async function handleUpdateTask(
   const { row, rowIndex } = await findTaskRow(env, token, tasksSheet, taskId);
   const currentStatus = normalizeStatus(row[TASK_COL.STATUS]);
   if (currentStatus === STATUS.DELETED) throw new HttpError(409, MSG.errTaskAlreadyDeleted);
+  const now = formatDateTime(new Date());
   await updateTaskRow(env, token, tasksSheet, rowIndex, {
     [TASK_COL.CATEGORY]: parsed.category,
     [TASK_COL.TITLE]: parsed.title,
     [TASK_COL.COMPLETE_REWARD]: parsed.completeReward,
     [TASK_COL.SUBMIT_REWARD]: 0,
     [TASK_COL.EXPIRY]: parsed.expiry,
+    [TASK_COL.UPDATED_AT]: now,
   });
   return {
     taskId,
@@ -344,6 +349,7 @@ export async function handleUpdateTask(
       completeReward: parsed.completeReward,
       points: parsed.completeReward,
       expiry: parsed.expiry,
+      updatedAt: now,
     },
   };
 }

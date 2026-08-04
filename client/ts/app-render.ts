@@ -25,6 +25,26 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
   return compareTextJa(taskSortKeyText(a.id), taskSortKeyText(b.id));
 }
 
+function timestampOf(value: unknown, parseDate: LPRendererDeps['parseDate']): number {
+  const parsed = parseDate(value);
+  if (!parsed) return -Infinity;
+  return parsed.getTime();
+}
+
+function dayStart(d: Date): Date {
+  const out = new Date(d);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
+function daysUntilDate(source: unknown, parseDate: LPRendererDeps['parseDate']): number | null {
+  const parsed = parseDate(source);
+  if (!parsed) return null;
+  const target = dayStart(parsed).getTime();
+  const today = dayStart(new Date()).getTime();
+  return Math.floor((target - today) / (24 * 60 * 60 * 1000));
+}
+
   function statusClassOf(task: LPTask, status: ReturnType<LPRendererDeps['getStatus']>): string {
     if (task.status === status.SUBMITTED) return 'status-applied';
     if (task.status === status.REQUESTED) return 'status-requested';
@@ -37,11 +57,16 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
     task: LPTask,
     tr: LPTranslator,
     formatDate: LPRendererDeps['formatDate'],
-    isExpired: LPRendererDeps['isExpired']
+    parseDate: LPRendererDeps['parseDate']
   ): string {
     if (!task.expiry) return '';
-    const expired = isExpired(task.expiry);
-    return tr('tasks.expiryLabel', { date: formatDate(task.expiry) }) + (expired ? ' ⚠️' : '');
+    const daysUntil = daysUntilDate(task.expiry, parseDate);
+    let suffix = '';
+    if (daysUntil != null) {
+      if (daysUntil < 0) suffix = ' 🚨';
+      else if (daysUntil <= 3) suffix = ' ⚠️';
+    }
+    return tr('tasks.expiryLabel', { date: formatDate(task.expiry) }) + suffix;
   }
 
   function taskActionHtmlOf(
@@ -230,7 +255,7 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
     const getStatus = deps.getStatus;
     const escapeHtml = deps.escapeHtml;
     const formatDate = deps.formatDate;
-    const isExpired = deps.isExpired;
+    const parseDate = deps.parseDate;
     const onTaskAction = deps.onTaskAction;
     const swipeState: TaskSwipeState = {
       openTaskId: '',
@@ -269,7 +294,7 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
     function taskItemHtml(task: LPTask) {
       const status = getStatus();
       const statusClass = statusClassOf(task, status);
-      const expiryLabel = expiryLabelOf(task, tr, formatDate, isExpired);
+      const expiryLabel = expiryLabelOf(task, tr, formatDate, parseDate);
       const actionHtml = taskActionHtmlOf(task, state, status, tr, escapeHtml);
       const requestHint = state.parentMode && task.status === status.REQUESTED
         ? '<span class="task-request-hint">' + escapeHtml(tr('tasks.requestHint')) + '</span>'
@@ -390,7 +415,25 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
         if (bucket) bucket.push(t);
       });
 
-      const categoryKeys = Array.from(groups.keys()).sort(compareTextJa);
+      const categoryUpdatedMax = new Map<string, number>();
+      for (const key of groups.keys()) {
+        const items = groups.get(key) || [];
+        if (items.length === 0) {
+          categoryUpdatedMax.set(key, -Infinity);
+          continue;
+        }
+        let maxTs = -Infinity;
+        for (const item of items) {
+          const ts = timestampOf(item.updatedAt, parseDate);
+          if (ts > maxTs) maxTs = ts;
+        }
+        categoryUpdatedMax.set(key, maxTs);
+      }
+      const categoryKeys = Array.from(groups.keys()).sort(function (a, b) {
+        const byUpdatedAt = (categoryUpdatedMax.get(b) || -Infinity) - (categoryUpdatedMax.get(a) || -Infinity);
+        if (byUpdatedAt !== 0) return byUpdatedAt;
+        return compareTextJa(a, b);
+      });
       const groupsHtml = categoryKeys.map(function (key) {
         const items = (groups.get(key) || []).slice().sort(compareTaskByTitleThenId);
         return taskGroupHtml(key, items, {

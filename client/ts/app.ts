@@ -11,6 +11,7 @@
   const store = window.LESSERPAY_STORE.create(SK);
   const utils = window.LESSERPAY_UTILS.create({ tr: tr });
   const escapeHtml = utils.escapeHtml;
+  const parseDate = utils.parseDate;
   const formatDate = utils.formatDate;
   const isExpired = utils.isExpired;
   const withBusy = utils.withBusy;
@@ -127,6 +128,7 @@
     tr: tr,
     getStatus: function () { return STATUS; },
     escapeHtml: escapeHtml,
+    parseDate: parseDate,
     formatDate: formatDate,
     isExpired: isExpired,
     onTaskAction: controller.onTaskAction,

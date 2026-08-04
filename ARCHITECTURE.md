@@ -182,9 +182,17 @@ are derived from it.
 | 4     | `SUBMIT_REWARD`    | Legacy field. New create/update flows write `0` by design. |
 | 5     | `COMPLETE_REWARD`  | Granted when the parent approves |
 | 6     | `EXPIRY`           | YYYY/MM/DD; used for deadline display and reminder notifications |
+| 7     | `UPDATED_AT`       | `yyyy/MM/dd HH:mm`; set on create/update/status transitions; backfilled on read if blank |
 
 To add a column: append a key to `TASK_SCHEMA`. Everything else updates
 automatically.
+
+`UPDATED_AT` lifecycle:
+
+- Create task: set to "now".
+- Update task fields: set to "now".
+- Status transitions (`casTaskStatus`): status + `UPDATED_AT` are written together.
+- Legacy rows: if `TITLE` exists and `UPDATED_AT` is blank, it is backfilled during `readUserData`.
 
 ### History sheet (`History_<user>`)
 
@@ -357,7 +365,7 @@ Auto-created by the scheduled reminder job. Columns (A:E): `date, user, taskId, 
 
 - Used only for idempotency: if `date + user + taskId` already exists for today (JST),
   reminder push for that task is skipped.
-- Current rule: remind only tasks due tomorrow and not yet approved (`status !== Approved`).
+- Current rule: remind tasks due within 3 days (JST, inclusive of today) and not yet approved (`status !== Approved`).
 
 ## i18n
 
@@ -419,8 +427,10 @@ columns in whatever language they prefer without affecting behaviour.
 - `app-utils.ts` — `escapeHtml`, date parsing/formatting, expired checks,
   and busy-state helpers.
 - `app-render.ts` — pure render layer (`render()`, `renderTabs()`, task/history
-  templates). No network calls. Parent-mode task tiles render left-side
-  edit/delete affordances (desktop: always visible; mobile: revealed by swipe).
+  templates). No network calls. Category groups are ordered by each group's
+  max `updatedAt` (desc), and items inside a category are ordered by title.
+  Parent-mode task tiles render left-side edit/delete affordances (desktop:
+  always visible; mobile: revealed by swipe).
 - `app-controller-data.ts` — API wrapper (`api()`), boot flow (`bootstrap()`),
   config refresh, cache-aware `loadData()`, and locked-screen rendering.
 - `app-controller-actions.ts` — mutation-side UI actions (`apply/approve/reject`,

@@ -31,7 +31,7 @@ npx wrangler login
 - `Tasks_<key>` 例: `Tasks_Light`
 - `History_<key>` 例: `History_Light`
 
-`Tasks_<key>` は A〜G 列で以下の順番にしてください:
+`Tasks_<key>` は A〜H 列で以下の順番にしてください:
 
 - A: ID
 - B: Status
@@ -40,6 +40,7 @@ npx wrangler login
 - E: SubmitReward
 - F: CompleteReward
 - G: Expiry (`YYYY/MM/DD`)
+- H: UpdatedAt (`YYYY/MM/DD HH:mm`)
 
 `History_<key>` は A〜C 列で以下の順番にしてください:
 
