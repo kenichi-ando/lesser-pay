@@ -436,7 +436,8 @@ columns in whatever language they prefer without affecting behaviour.
   and busy-state helpers.
 - `app-render.ts` — pure render layer (`render()`, `renderTabs()`, task/history
   templates). No network calls. Category groups are ordered by each group's
-  max `updatedAt` (desc), and items inside a category are ordered by title.
+  nearest expiry (days-until ascending; groups with no expiry go last), then by
+  category name (`ja` locale). Items inside a category are ordered by title.
   Parent-mode task tiles render left-side edit/delete affordances (desktop:
   always visible; mobile: revealed by swipe).
 - `app-controller-data.ts` — API wrapper (`api()`), boot flow (`bootstrap()`),
