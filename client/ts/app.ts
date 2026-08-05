@@ -1,4 +1,12 @@
 /// <reference path="./global.d.ts" />
+/**
+ * Browser entrypoint and wiring layer.
+ *
+ * Architectural contract:
+ * - This module wires DOM events and composes controller/renderer dependencies.
+ * - It does not enforce business/security rules; authoritative checks live in the Worker.
+ * - Client-side state is UI/session state only (user selection, parent mode, view state).
+ */
 (function () {
   'use strict';
 

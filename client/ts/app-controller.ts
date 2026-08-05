@@ -1,4 +1,12 @@
 /// <reference path="./global.d.ts" />
+/**
+ * Parent-mode/user-selection orchestration for the SPA.
+ *
+ * Architectural contract:
+ * - Coordinates UI/session flows (user switching, parent login, popovers/modals).
+ * - Delegates all mutating operations to `LP_CONTROLLER_DATA.api()` (Worker `/api`).
+ * - Never treats client state as authority for task transitions or permissions.
+ */
 (function () {
   'use strict';
 

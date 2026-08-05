@@ -1,5 +1,13 @@
 /// <reference path="./global.d.ts" />
 /// <reference path="../../shared/contracts.d.ts" />
+/**
+ * Data/controller boundary for client <-> Worker communication.
+ *
+ * Architectural contract:
+ * - All API calls go through this module (`fetch('/api')` with bearer token).
+ * - Handles lock-screen bootstrap (`redeemInvite` -> API token) and token expiry fallback.
+ * - Maintains only short-lived UI cache; source of truth remains server + spreadsheet.
+ */
 
 function isStandaloneMode(): boolean {
   if (typeof window === 'undefined') return false;

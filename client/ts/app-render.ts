@@ -1,4 +1,12 @@
 /// <reference path="./global.d.ts" />
+/**
+ * Pure rendering layer for tasks/history.
+ *
+ * Architectural contract:
+ * - Renders server-provided state into DOM (grouping/sorting/badges/swipe affordances).
+ * - Can compute presentation-only derivatives (counts, order, formatting).
+ * - Must not perform network I/O or enforce business invariants.
+ */
 (function () {
   'use strict';
   const SWIPE_INTENT_PX = 12;

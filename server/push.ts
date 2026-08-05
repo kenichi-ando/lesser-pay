@@ -1,3 +1,12 @@
+/**
+ * Web Push implementation (VAPID + RFC 8291 payload encryption).
+ *
+ * Architectural contract:
+ * - Push fan-out is server-side only. The browser never talks to push gateways.
+ * - Subscriptions are persisted in the `PushSubscriptions` sheet.
+ * - Payloads are encrypted (`aes128gcm`) for compatibility with APNs/FCM endpoints.
+ * - Delivery is best-effort: failures are logged and stale endpoints are pruned.
+ */
 import type { Env } from "./env";
 import { getAccessToken } from "./api";
 import { b64url, b64urlBytes, formatDateTime } from "./util";
