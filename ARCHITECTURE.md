@@ -181,7 +181,7 @@ are derived from it.
 | 3     | `TITLE`            | Required |
 | 4     | `SUBMIT_REWARD`    | Legacy field. New create/update flows write `0` by design. |
 | 5     | `COMPLETE_REWARD`  | Granted when the parent approves |
-| 6     | `EXPIRY`           | YYYY/MM/DD; used for deadline display and reminder notifications |
+| 6     | `EXPIRY`           | YYYY/MM/DD; used for deadline display, reminder notifications, and overdue reward decay |
 | 7     | `UPDATED_AT`       | `yyyy/MM/dd HH:mm`; set on create/update/status transitions; backfilled on read if blank |
 
 To add a column: append a key to `TASK_SCHEMA`. Everything else updates
@@ -193,6 +193,13 @@ automatically.
 - Update task fields: set to "now".
 - Status transitions (`casTaskStatus`): status + `UPDATED_AT` are written together.
 - Legacy rows: if `TITLE` exists and `UPDATED_AT` is blank, it is backfilled during `readUserData`.
+
+Overdue reward/visibility rules (JST date basis):
+
+- `COMPLETE_REWARD` decays by 10% for each overdue day (1 day late = 90%, ... 9 days late = 10%).
+- 10+ overdue days => reward is effectively 0 and the task is hidden from `getData` responses regardless of status (including `Approved`).
+- Reward is computed server-side so UI display and awarded points stay consistent.
+- For `Submitted` tasks, approval uses the submit-time timestamp (`UPDATED_AT` at submit transition) as the penalty reference, so parent-side approval delay does not add extra decay.
 
 ### History sheet (`History_<user>`)
 
@@ -366,6 +373,7 @@ Auto-created by the scheduled reminder job. Columns (A:E): `date, user, taskId, 
 - Used only for idempotency: if `date + user + taskId` already exists for today (JST),
   reminder push for that task is skipped.
 - Current rule: remind tasks due within 3 days (JST, inclusive of today) and not yet approved (`status !== Approved`).
+- Notification style: one notification per child (for both child and parent recipients), with count-only copy (`{user}...({n}件)`), no task-title list in the body.
 
 ## i18n
 

@@ -91,6 +91,67 @@ export function isExpired(v: unknown): boolean {
 	return parsed.getTime() < todayTokyoStart();
 }
 
+function parseDateLike(v: unknown): Date | null {
+	if (v == null || v === "") return null;
+	if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v;
+	if (typeof v === "number") {
+		const asDate = new Date(v);
+		return Number.isNaN(asDate.getTime()) ? null : asDate;
+	}
+	if (typeof v !== "string") return null;
+	const normalized = v.replaceAll("-", "/");
+	const parsed = new Date(normalized);
+	if (!Number.isNaN(parsed.getTime())) return parsed;
+	const fallback = new Date(v);
+	return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function toJstDateParts(source: Date): { y: number; m: number; d: number } {
+	const jst = new Date(source.getTime() + 9 * 60 * 60 * 1000);
+	return {
+		y: jst.getUTCFullYear(),
+		m: jst.getUTCMonth() + 1,
+		d: jst.getUTCDate(),
+	};
+}
+
+// Returns overdue days in JST date units.
+// 0 means on-time or future, 1.. means late by N full days.
+export function overdueDaysJst(expiryRaw: unknown, referenceRaw: unknown = new Date()): number | null {
+	const expiry = parseDateLike(expiryRaw);
+	const reference = parseDateLike(referenceRaw);
+	if (!expiry || !reference) return null;
+	const e = toJstDateParts(expiry);
+	const r = toJstDateParts(reference);
+	const expiryUtc = Date.UTC(e.y, e.m - 1, e.d);
+	const referenceUtc = Date.UTC(r.y, r.m - 1, r.d);
+	const diffDays = Math.floor((referenceUtc - expiryUtc) / (24 * 60 * 60 * 1000));
+	return Math.max(diffDays, 0);
+}
+
+export function applyLatePenalty(basePoints: number, overdueDays: number): number {
+	const base = Number.isFinite(basePoints) ? Math.max(0, Math.floor(basePoints)) : 0;
+	if (base <= 0) return 0;
+	if (overdueDays <= 0) return base;
+	if (overdueDays >= 10) return 0;
+	return Math.max(0, Math.floor((base * (10 - overdueDays)) / 10));
+}
+
+export function rewardWithLatePenalty(
+	basePoints: number,
+	expiryRaw: unknown,
+	referenceRaw: unknown = new Date(),
+): number {
+	const overdue = overdueDaysJst(expiryRaw, referenceRaw);
+	if (overdue == null) return Number.isFinite(basePoints) ? Math.max(0, Math.floor(basePoints)) : 0;
+	return applyLatePenalty(basePoints, overdue);
+}
+
+export function shouldHideExpiredTask(expiryRaw: unknown, referenceRaw: unknown = new Date()): boolean {
+	const overdue = overdueDaysJst(expiryRaw, referenceRaw);
+	return overdue != null && overdue >= 10;
+}
+
 // "yyyy/MM/dd HH:mm" in Asia/Tokyo, matching gas/Code.gs formatDateTime.
 export function formatDateTime(d: Date): string {
 	const tokyo = new Date(d.getTime() + 9 * 3600 * 1000);

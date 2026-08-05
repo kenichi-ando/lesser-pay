@@ -24,6 +24,8 @@ import {
 	nonEmpty,
 	toDateString,
 	toDateTimeString,
+	rewardWithLatePenalty,
+	shouldHideExpiredTask,
 	toNumber,
 } from "./util";
 
@@ -418,20 +420,36 @@ export async function updateTaskRow(
 // ---------------------------------------------------------------------------
 
 function shapeTasks(rows: unknown[][]) {
+	const now = new Date();
 	return rows
 		.filter((r) => nonEmpty(r[TASK_COL.ID]) && nonEmpty(r[TASK_COL.TITLE]))
-		.filter((r) => normalizeStatus(r[TASK_COL.STATUS]) !== STATUS.DELETED)
-		.map((r) => ({
+		.filter((r) => {
+			const status = normalizeStatus(r[TASK_COL.STATUS]);
+			if (status === STATUS.DELETED) return false;
+			if (shouldHideExpiredTask(r[TASK_COL.EXPIRY], now)) return false;
+			return true;
+		})
+		.map((r) => {
+			const status = normalizeStatus(r[TASK_COL.STATUS]);
+			const baseCompleteReward = toNumber(r[TASK_COL.COMPLETE_REWARD]);
+			const rewardReference =
+				status === STATUS.SUBMITTED ? r[TASK_COL.UPDATED_AT] : now;
+			const completeReward =
+				status === STATUS.APPROVED
+					? baseCompleteReward
+					: rewardWithLatePenalty(baseCompleteReward, r[TASK_COL.EXPIRY], rewardReference);
+			return ({
 			id: toText(r[TASK_COL.ID]),
-			status: normalizeStatus(r[TASK_COL.STATUS]),
+			status,
 			category: toText(r[TASK_COL.CATEGORY]),
 			title: toText(r[TASK_COL.TITLE]),
 			submitReward: toNumber(r[TASK_COL.SUBMIT_REWARD]),
-			completeReward: toNumber(r[TASK_COL.COMPLETE_REWARD]),
-			points: toNumber(r[TASK_COL.COMPLETE_REWARD]), // back-compat: legacy `points`
+			completeReward,
+			points: completeReward, // back-compat: legacy `points`
 			expiry: toDateString(r[TASK_COL.EXPIRY]),
 			updatedAt: toDateTimeString(r[TASK_COL.UPDATED_AT]),
-		}));
+			});
+		});
 }
 
 function shapeHistory(rows: unknown[][]) {

@@ -35,7 +35,7 @@ export const MSG = {
 	notifySubjectReject: "{user}の課題に訂正依頼",
 	notifySubjectCashout: "{user}のポイント消費",
 	notifySubjectBonus: "{user}にボーナス付与",
-	notifySubjectDeadlineReminder: "{user}の期限リマインド",
+	notifySubjectDeadlineReminder: "{user}の期限リマインド ({n}件)",
 	notifyBonusBody: "{user} に「{label}」で {amount} pt のボーナスを付与しました。\n残高: {balance} pt",
 	notifyApplyBodyHeader: "{user} が「{label}」を完了報告しました。",
 	notifyApplyBodySubmit: "提出ポイント: {pt} pt (付与済み)",
@@ -46,10 +46,8 @@ export const MSG = {
 	notifyRequestApprovedBody: "{user} のタスク提案「{label}」が承認されました。\nタスク一覧に追加されました。",
 	notifyRejectBody: "{user} の「{label}」が訂正依頼になりました。内容を見直して再提出してください。",
 	notifyCashoutBody: "{user} が {amount} pt を使いました。\n残高: {balance} pt",
-	notifyDeadlineReminderBodyHeader: "{user}の期限が3日以内のタスクです。",
-	notifyDeadlineReminderBodyItem: "・{label} ({pt} pt) 期限: {expiry}",
-	notifyDeadlineReminderBodyFooterChild: "明日までに完了報告しよう！",
-	notifyDeadlineReminderBodyFooterParent: "必要なら声かけしてあげてください。",
+	notifyDeadlineReminderBodyChild: "{user}の期限が3日以内のタスクが {n} 件あります。",
+	notifyDeadlineReminderBodyParent: "{user}の期限が3日以内のタスクが {n} 件あります。",
 } as const;
 
 function consumeMessageError(_error: unknown): void {

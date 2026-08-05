@@ -171,28 +171,12 @@ async function appendReminderLogs(
 	}
 }
 
-function sortCandidates(candidates: ReminderCandidate[]): ReminderCandidate[] {
-	return candidates.slice().sort((a, b) => {
-		const byExpiry = a.expiry.localeCompare(b.expiry);
-		if (byExpiry !== 0) return byExpiry;
-		return taskLabel(a).localeCompare(taskLabel(b), "ja");
-	});
+function buildChildReminderBody(name: string, count: number): string {
+	return fmt(MSG.notifyDeadlineReminderBodyChild, { user: name, n: count });
 }
 
-function buildReminderBody(name: string, tasks: ReminderCandidate[], forParent: boolean): string {
-	const lines = [
-		fmt(MSG.notifyDeadlineReminderBodyHeader, { user: name }),
-		...sortCandidates(tasks).map((task) =>
-			fmt(MSG.notifyDeadlineReminderBodyItem, {
-				label: taskLabel(task),
-				pt: task.completeReward,
-				expiry: task.expiry,
-			}),
-		),
-		"",
-		forParent ? MSG.notifyDeadlineReminderBodyFooterParent : MSG.notifyDeadlineReminderBodyFooterChild,
-	];
-	return lines.join("\n");
+function buildParentReminderBody(name: string, count: number): string {
+	return fmt(MSG.notifyDeadlineReminderBodyParent, { user: name, n: count });
 }
 
 export async function runDeadlineReminders(env: Env, now = new Date()): Promise<void> {
@@ -226,9 +210,9 @@ export async function runDeadlineReminders(env: Env, now = new Date()): Promise<
 
 			if (candidates.length === 0) continue;
 			const displayName = labelFor(cfg.users, user);
-			const subject = fmt(MSG.notifySubjectDeadlineReminder, { user: displayName });
-			const childBody = buildReminderBody(displayName, candidates, false);
-			const parentBody = buildReminderBody(displayName, candidates, true);
+			const subject = fmt(MSG.notifySubjectDeadlineReminder, { user: displayName, n: candidates.length });
+			const childBody = buildChildReminderBody(displayName, candidates.length);
+			const parentBody = buildParentReminderBody(displayName, candidates.length);
 			await notify(env, subject, childBody, "child", user);
 			await notify(env, subject, parentBody, "parent");
 			for (const task of candidates) {

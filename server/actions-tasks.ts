@@ -12,7 +12,14 @@ import {
 } from "./api";
 import { checkPin, fetchConfig, labelFor } from "./config";
 import { notify } from "./notify";
-import { HttpError, formatDateTime, generateTaskId, toNumber } from "./util";
+import {
+  HttpError,
+  formatDateTime,
+  generateTaskId,
+  rewardWithLatePenalty,
+  shouldHideExpiredTask,
+  toNumber,
+} from "./util";
 
 const TASK_TITLE_MAX_LEN = 80;
 const TASK_CATEGORY_MAX_LEN = 40;
@@ -138,7 +145,14 @@ export async function handleApplyTask(env: Env, user: string, taskId: string) {
   if (currentStatus === STATUS.DELETED) throw new HttpError(409, MSG.errTaskAlreadyDeleted);
 
   const submitReward = toNumber(row[TASK_COL.SUBMIT_REWARD]);
-  const completeReward = toNumber(row[TASK_COL.COMPLETE_REWARD]);
+  const completeReward = rewardWithLatePenalty(
+    toNumber(row[TASK_COL.COMPLETE_REWARD]),
+    row[TASK_COL.EXPIRY],
+    new Date(),
+  );
+  if (shouldHideExpiredTask(row[TASK_COL.EXPIRY], new Date())) {
+    throw new HttpError(409, MSG.errExpired);
+  }
   const taskLabel = taskLabelFromRow(row);
   const isFirstSubmit = currentStatus !== STATUS.RETURNED;
 
@@ -192,7 +206,11 @@ export async function handleApproveTask(env: Env, user: string, taskId: string, 
   }
 
   const taskLabel = taskLabelFromRow(row);
-  const points = toNumber(row[TASK_COL.COMPLETE_REWARD]);
+  const points = rewardWithLatePenalty(
+    toNumber(row[TASK_COL.COMPLETE_REWARD]),
+    row[TASK_COL.EXPIRY],
+    row[TASK_COL.UPDATED_AT],
+  );
   const content = HISTORY_LABEL.APPROVE_PREFIX + taskLabel;
 
   const rows = await readHistoryRows(env, token, historySheet);
