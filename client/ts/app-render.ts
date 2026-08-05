@@ -25,12 +25,6 @@ function compareTaskByTitleThenId(a: LPTask, b: LPTask): number {
   return compareTextJa(taskSortKeyText(a.id), taskSortKeyText(b.id));
 }
 
-function timestampOf(value: unknown, parseDate: LPRendererDeps['parseDate']): number {
-  const parsed = parseDate(value);
-  if (!parsed) return -Infinity;
-  return parsed.getTime();
-}
-
 function dayStart(d: Date): Date {
   const out = new Date(d);
   out.setHours(0, 0, 0, 0);
@@ -415,23 +409,24 @@ function daysUntilDate(source: unknown, parseDate: LPRendererDeps['parseDate']):
         if (bucket) bucket.push(t);
       });
 
-      const categoryUpdatedMax = new Map<string, number>();
+      const categoryNearestExpiryDays = new Map<string, number>();
       for (const key of groups.keys()) {
         const items = groups.get(key) || [];
         if (items.length === 0) {
-          categoryUpdatedMax.set(key, -Infinity);
+          categoryNearestExpiryDays.set(key, Infinity);
           continue;
         }
-        let maxTs = -Infinity;
+        let nearestDays = Infinity;
         for (const item of items) {
-          const ts = timestampOf(item.updatedAt, parseDate);
-          if (ts > maxTs) maxTs = ts;
+          const daysUntil = daysUntilDate(item.expiry, parseDate);
+          if (daysUntil == null) continue;
+          if (daysUntil < nearestDays) nearestDays = daysUntil;
         }
-        categoryUpdatedMax.set(key, maxTs);
+        categoryNearestExpiryDays.set(key, nearestDays);
       }
       const categoryKeys = Array.from(groups.keys()).sort(function (a, b) {
-        const byUpdatedAt = (categoryUpdatedMax.get(b) || -Infinity) - (categoryUpdatedMax.get(a) || -Infinity);
-        if (byUpdatedAt !== 0) return byUpdatedAt;
+        const byNearestExpiry = (categoryNearestExpiryDays.get(a) || Infinity) - (categoryNearestExpiryDays.get(b) || Infinity);
+        if (byNearestExpiry !== 0) return byNearestExpiry;
         return compareTextJa(a, b);
       });
       const groupsHtml = categoryKeys.map(function (key) {
