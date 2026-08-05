@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "client:build": "tsc -p tsconfig.client.json",
-    "client:dev": "tsc -p tsconfig.client.json --watch",
+    "client:build": "vite build",
+    "client:dev": "vite",
     "client:typecheck": "tsc -p tsconfig.client.json --noEmit",
     "server:typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck": "npm run client:typecheck && npm run server:typecheck",
@@ -14,10 +14,10 @@
     "cf-typegen": "wrangler types"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260517.1",
-    "@types/node": "^25.8.0",
-    "typescript": "^5.5.2",
-    "vite": "^8.1.3",
-    "wrangler": "^4.95.0"
+    "@cloudflare/workers-types": "^5.20260729.1",
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5",
+    "wrangler": "^4.115.0"
   }
 }

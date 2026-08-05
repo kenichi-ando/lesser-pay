@@ -5,8 +5,8 @@ node_modules/
 firebase-debug.log
 *.log
 
-client/js/*.js
-client/js/*.js.map
+client-dist/
+client/js/
 
 # wrangler / Cloudflare Workers
 .dev.vars*

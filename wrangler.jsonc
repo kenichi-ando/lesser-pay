@@ -15,13 +15,13 @@
 		"nodejs_compat"
 	],
 	/**
-	 * Static assets — the frontend in `./client` is served by the Worker,
+	 * Static assets — the frontend build in `./client-dist` is served by the Worker,
 	 * so the Worker URL hosts both the SPA and the API on the same origin.
 	 * `run_worker_first` ensures /api requests reach the Worker even though
 	 * /index.html exists in the assets bundle.
 	 */
 	"assets": {
-		"directory": "./client",
+		"directory": "./client-dist",
 		"binding": "ASSETS",
 		"run_worker_first": ["/api", "/api/*"]
 	},
