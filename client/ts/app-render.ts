@@ -47,6 +47,28 @@ function daysUntilDate(source: unknown, parseDate: LPRendererDeps['parseDate']):
   return Math.floor((target - today) / (24 * 60 * 60 * 1000));
 }
 
+// Category order by nearest relevant expiry (daysUntil >= -5: overdue 1–5 through upcoming).
+// Categories with only stale overdue (6+) or no expiry sink to the bottom.
+// Approved tasks are ignored for ranking.
+function categoryExpirySortKey(
+  items: LPTask[],
+  parseDate: LPRendererDeps['parseDate']
+): { bucket: number; key: number } {
+  let nearestRelevant = Infinity;
+  let hasRelevant = false;
+
+  for (const item of items) {
+    if (item.status === 'Approved') continue;
+    const daysUntil = daysUntilDate(item.expiry, parseDate);
+    if (daysUntil == null || daysUntil < -5) continue;
+    hasRelevant = true;
+    if (daysUntil < nearestRelevant) nearestRelevant = daysUntil;
+  }
+
+  if (hasRelevant) return { bucket: 0, key: nearestRelevant };
+  return { bucket: 1, key: 0 };
+}
+
   function statusClassOf(task: LPTask, status: ReturnType<LPRendererDeps['getStatus']>): string {
     if (task.status === status.SUBMITTED) return 'status-applied';
     if (task.status === status.REQUESTED) return 'status-requested';
@@ -59,8 +81,10 @@ function daysUntilDate(source: unknown, parseDate: LPRendererDeps['parseDate']):
     task: LPTask,
     tr: LPTranslator,
     formatDate: LPRendererDeps['formatDate'],
-    parseDate: LPRendererDeps['parseDate']
+    parseDate: LPRendererDeps['parseDate'],
+    status: ReturnType<LPRendererDeps['getStatus']>
   ): string {
+    if (task.status === status.APPROVED) return '';
     if (!task.expiry) return '';
     const daysUntil = daysUntilDate(task.expiry, parseDate);
     let suffix = '';
@@ -296,7 +320,7 @@ function daysUntilDate(source: unknown, parseDate: LPRendererDeps['parseDate']):
     function taskItemHtml(task: LPTask) {
       const status = getStatus();
       const statusClass = statusClassOf(task, status);
-      const expiryLabel = expiryLabelOf(task, tr, formatDate, parseDate);
+      const expiryLabel = expiryLabelOf(task, tr, formatDate, parseDate, status);
       const actionHtml = taskActionHtmlOf(task, state, status, tr, escapeHtml);
       const requestHint = state.parentMode && task.status === status.REQUESTED
         ? '<span class="task-request-hint">' + escapeHtml(tr('tasks.requestHint')) + '</span>'
@@ -417,24 +441,29 @@ function daysUntilDate(source: unknown, parseDate: LPRendererDeps['parseDate']):
         if (bucket) bucket.push(t);
       });
 
-      const categoryNearestExpiryDays = new Map<string, number>();
-      for (const key of groups.keys()) {
+      // Keep completed tasks visible while a category still has open work;
+      // hide the category only once every task in it is approved.
+      const openCategoryKeys = Array.from(groups.keys()).filter(function (key) {
         const items = groups.get(key) || [];
-        if (items.length === 0) {
-          categoryNearestExpiryDays.set(key, Infinity);
-          continue;
-        }
-        let nearestDays = Infinity;
-        for (const item of items) {
-          const daysUntil = daysUntilDate(item.expiry, parseDate);
-          if (daysUntil == null) continue;
-          if (daysUntil < nearestDays) nearestDays = daysUntil;
-        }
-        categoryNearestExpiryDays.set(key, nearestDays);
+        return items.some(function (t) { return t.status !== status.APPROVED; });
+      });
+      if (openCategoryKeys.length === 0) {
+        els.tasksList.innerHTML = '<div class="empty-state">' + escapeHtml(tr('tasks.empty')) + '</div>' + addOtherButton;
+        els.tasksList.querySelectorAll('[data-action="add-other-task"]').forEach(function (btn) {
+          btn.addEventListener('click', onTaskAction);
+        });
+        return;
       }
-      const categoryKeys = Array.from(groups.keys()).sort(function (a, b) {
-        const byNearestExpiry = (categoryNearestExpiryDays.get(a) || Infinity) - (categoryNearestExpiryDays.get(b) || Infinity);
-        if (byNearestExpiry !== 0) return byNearestExpiry;
+
+      const categorySortKeys = new Map<string, { bucket: number; key: number }>();
+      for (const key of openCategoryKeys) {
+        categorySortKeys.set(key, categoryExpirySortKey(groups.get(key) || [], parseDate));
+      }
+      const categoryKeys = openCategoryKeys.slice().sort(function (a, b) {
+        const ka = categorySortKeys.get(a) || { bucket: 1, key: 0 };
+        const kb = categorySortKeys.get(b) || { bucket: 1, key: 0 };
+        if (ka.bucket !== kb.bucket) return ka.bucket - kb.bucket;
+        if (ka.key !== kb.key) return ka.key - kb.key;
         return compareTextJa(a, b);
       });
       const groupsHtml = categoryKeys.map(function (key) {

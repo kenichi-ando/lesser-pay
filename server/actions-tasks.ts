@@ -18,7 +18,6 @@ import {
   formatDateTime,
   generateTaskId,
   rewardWithLatePenalty,
-  shouldHideExpiredTask,
   toNumber,
   toText,
 } from "./util";
@@ -130,9 +129,6 @@ export async function handleApplyTask(env: Env, user: string, taskId: string) {
     row[TASK_COL.EXPIRY],
     new Date(),
   );
-  if (shouldHideExpiredTask(row[TASK_COL.EXPIRY], new Date())) {
-    throw new HttpError(409, MSG.errExpired);
-  }
   const taskLabel = taskLabelFromRow(row);
   const isFirstSubmit = currentStatus !== STATUS.RETURNED;
 

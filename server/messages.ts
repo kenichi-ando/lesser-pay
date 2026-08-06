@@ -16,7 +16,6 @@ export const MSG = {
 	errTaskIdMissing: "taskId が未指定",
 	errAlreadyApplied: "すでに申請中です",
 	errAlreadyApproved: "すでに承認済みです",
-	errExpired: "期限切れです",
 	errNotAppliedTask: "申請中の課題ではありません (現在: {status})",
 	errCannotRejectApproved: "承認済みの課題は訂正依頼できません",
 	errTaskAlreadyDeleted: "この課題はすでに削除済みです",

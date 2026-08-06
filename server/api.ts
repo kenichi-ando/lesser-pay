@@ -25,7 +25,6 @@ import {
 	toDateString,
 	toDateTimeString,
 	rewardWithLatePenalty,
-	shouldHideExpiredTask,
 	toNumber,
 	toText,
 } from "./util";
@@ -398,7 +397,6 @@ function shapeTasks(rows: unknown[][]) {
 		.filter((r) => {
 			const status = normalizeStatus(r[TASK_COL.STATUS]);
 			if (status === STATUS.DELETED) return false;
-			if (shouldHideExpiredTask(r[TASK_COL.EXPIRY], now)) return false;
 			return true;
 		})
 		.map((r) => {

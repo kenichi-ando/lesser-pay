@@ -107,12 +107,13 @@ export function overdueDaysJst(expiryRaw: unknown, referenceRaw: unknown = new D
 	return Math.max(diffDays, 0);
 }
 
+// 1 day late → 90%, … 5+ days late → 50% (floor; still earn half).
 export function applyLatePenalty(basePoints: number, overdueDays: number): number {
 	const base = Number.isFinite(basePoints) ? Math.max(0, Math.floor(basePoints)) : 0;
 	if (base <= 0) return 0;
 	if (overdueDays <= 0) return base;
-	if (overdueDays >= 10) return 0;
-	return Math.max(0, Math.floor((base * (10 - overdueDays)) / 10));
+	const cappedDays = Math.min(overdueDays, 5);
+	return Math.max(0, Math.floor((base * (10 - cappedDays)) / 10));
 }
 
 export function rewardWithLatePenalty(
@@ -123,11 +124,6 @@ export function rewardWithLatePenalty(
 	const overdue = overdueDaysJst(expiryRaw, referenceRaw);
 	if (overdue == null) return Number.isFinite(basePoints) ? Math.max(0, Math.floor(basePoints)) : 0;
 	return applyLatePenalty(basePoints, overdue);
-}
-
-export function shouldHideExpiredTask(expiryRaw: unknown, referenceRaw: unknown = new Date()): boolean {
-	const overdue = overdueDaysJst(expiryRaw, referenceRaw);
-	return overdue != null && overdue >= 10;
 }
 
 // "yyyy/MM/dd HH:mm" in Asia/Tokyo, matching gas/Code.gs formatDateTime.
