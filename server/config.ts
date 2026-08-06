@@ -1,18 +1,16 @@
 /**
- * Runtime config — derived from wrangler secrets, not from a spreadsheet.
+ * Runtime config — parent PIN from secrets; user roster from the `Users` sheet.
  *
- * Everything is set once via `wrangler secret put …`:
- *   - PARENT_PIN: parent-mode PIN (string)
- *   - USERS:      Comma-separated `key:label` pairs, e.g. `Light:Light, Tiara:Tiara`.
- *                 `label` is optional (`key` is used when omitted).
- *
- * Family-scale apps don't change the roster often enough for the spreadsheet
- * round-trip to be worth the extra Sheets read on every action.
+ * Sheet columns: A=key, B=label (row 1 = headers).
+ * Users are cached briefly in the Worker isolate; `getConfig` (login switch /
+ * bootstrap) passes `{ force: true }` to bypass the cache.
  */
 
 import type { Env } from "./env";
+import { getAccessToken } from "./api";
 import { MSG } from "./messages";
-import { HttpError, constantTimeEqual } from "./util";
+import { ensureSheet } from "./sheets";
+import { HttpError, constantTimeEqual, toText } from "./util";
 
 export interface User {
 	key: string;
@@ -24,50 +22,67 @@ export interface Config {
 	users: User[];
 }
 
+/** Sheet key used for the optional debug roster row; cron skips this user. */
 export const DEBUG_USER_KEY = "Debug";
-const DEBUG_USER_LABEL = "Debug User";
 
-// Cache the parsed users list per Worker isolate. USERS is a static secret —
-// re-parsing on every request would be wasteful, and a stale parse can only
-// happen at the next deploy (which restarts the isolate anyway).
-let usersCache: { raw: string; parsed: User[] } | null = null;
+const USERS_SHEET = "Users";
+const USERS_HEADERS = ["key", "label"] as const;
+const USERS_CACHE_TTL_MS = 60_000;
 
-function parseUsers(raw: string): User[] {
-	if (!raw) return [];
-	if (usersCache?.raw === raw) return usersCache.parsed;
+let usersCache: { ts: number; users: User[] } | null = null;
 
-	const parsed: User[] = [];
-	for (const entry of raw.split(",")) {
-		const [keyPart, ...labelParts] = entry.split(":");
-		const key = (keyPart ?? "").trim();
-		if (!key) continue;
-		const label = labelParts.join(":").trim() || key;
-		parsed.push({ key, label });
-	}
-	usersCache = { raw, parsed };
-	return parsed;
-}
-
-export function fetchConfig(env: Env): Config {
-	const base = parseUsers(env.USERS ?? "");
-	const debugEnabled = String(env.DEBUG ?? "").trim() === "1";
-	const users =
-		debugEnabled && !base.some((u) => u.key === DEBUG_USER_KEY)
-			? [...base, { key: DEBUG_USER_KEY, label: DEBUG_USER_LABEL }]
-			: base;
+export async function fetchConfig(
+	env: Env,
+	options?: { force?: boolean },
+): Promise<Config> {
+	const users = await loadUsers(env, options?.force === true);
 	return {
 		parentPin: env.PARENT_PIN ?? "",
 		users,
 	};
 }
 
+async function loadUsers(env: Env, force: boolean): Promise<User[]> {
+	const now = Date.now();
+	if (!force && usersCache && now - usersCache.ts < USERS_CACHE_TTL_MS) {
+		return usersCache.users;
+	}
+
+	const token = await getAccessToken(env);
+	await ensureSheet(env, token, USERS_SHEET, USERS_HEADERS);
+	const users = await readUsersSheet(env, token);
+	usersCache = { ts: now, users };
+	return users;
+}
+
+async function readUsersSheet(env: Env, token: string): Promise<User[]> {
+	const range = `${USERS_SHEET}!A2:B`;
+	const url = `https://sheets.googleapis.com/v4/spreadsheets/${env.GOOGLE_SHEET_ID}/values/${encodeURIComponent(range)}`;
+	const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+	if (!res.ok) {
+		console.warn("Users sheet read failed:", res.status, await res.text());
+		return [];
+	}
+	const body = (await res.json()) as { values?: unknown[][] };
+	const seen = new Set<string>();
+	const users: User[] = [];
+	for (const row of body.values ?? []) {
+		const key = toText(row[0]).trim();
+		if (!key || seen.has(key)) continue;
+		seen.add(key);
+		const label = toText(row[1]).trim() || key;
+		users.push({ key, label });
+	}
+	return users;
+}
+
 // Throws if the PIN is missing, the server is misconfigured, or the supplied
 // PIN does not match. Used by every parent-only action.
-export function checkPin(env: Env, pin: unknown): void {
+export async function checkPin(env: Env, pin: unknown): Promise<void> {
 	if (typeof pin !== "string" || pin.length === 0) {
 		throw new HttpError(400, MSG.errPinRequired);
 	}
-	const cfg = fetchConfig(env);
+	const cfg = await fetchConfig(env);
 	if (!cfg.parentPin) {
 		throw new HttpError(500, MSG.errParentPinNotSet);
 	}

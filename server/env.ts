@@ -19,12 +19,6 @@ export interface Env {
 	API_TOKEN: string;
 	// Parent-mode PIN (verified on approve / reject / cashout).
 	PARENT_PIN: string;
-	// Comma-separated key:label pairs for the user roster, e.g.
-	//   "Light:Light, Tiara:Tiara"
-	USERS: string;
-	// Optional debug switch.
-	// "1" => append Debug user to roster, "0"/unset => disabled.
-	DEBUG?: string;
 	// Optional: VAPID key pair for Web Push (PWA notifications).
 	// Unset → push notifications are skipped.
 	PUSH_VAPID_PUBLIC_KEY?: string;

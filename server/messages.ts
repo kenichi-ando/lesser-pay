@@ -5,6 +5,8 @@
  * by the frontend, so wording matters. Keep this in sync with gas/Code.gs MSG.
  */
 
+import { toText } from "./util";
+
 export const MSG = {
 	errPinRequired: "暗証番号を入力してください",
 	errPinWrong: "暗証番号が違います",
@@ -46,29 +48,10 @@ export const MSG = {
 	notifyRequestApprovedBody: "{user} のタスク提案「{label}」が承認されました。\nタスク一覧に追加されました。",
 	notifyRejectBody: "{user} の「{label}」が訂正依頼になりました。内容を見直して再提出してください。",
 	notifyCashoutBody: "{user} が {amount} pt を使いました。\n残高: {balance} pt",
-	notifyDeadlineReminderBodyChild: "{user}の期限が3日以内のタスクが {n} 件あります。",
-	notifyDeadlineReminderBodyParent: "{user}の期限が3日以内のタスクが {n} 件あります。",
+	notifyDeadlineReminderBody: "{user}の期限が3日以内のタスクが {n} 件あります。",
 } as const;
-
-function consumeMessageError(_error: unknown): void {
-	if (_error === undefined) return;
-}
-
-function toMessageText(value: unknown): string {
-	if (value == null) return "";
-	if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
-	if (typeof value === "bigint" || typeof value === "symbol") return String(value);
-	if (value instanceof Date) return String(value);
-	try {
-		const json = JSON.stringify(value);
-		return json ?? "";
-	} catch (err) {
-		consumeMessageError(err);
-		return "";
-	}
-}
 
 // Render a template like "{name} さん" with the given vars.
 export function fmt(tpl: string, vars: Record<string, unknown>): string {
-	return tpl.replace(/\{(\w+)\}/g, (_, k) => toMessageText(vars[k]));
+	return tpl.replace(/\{(\w+)\}/g, (_, k) => toText(vars[k]));
 }

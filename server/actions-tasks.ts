@@ -10,8 +10,9 @@ import {
   readHistoryRows,
   updateTaskRow,
 } from "./api";
-import { checkPin, fetchConfig, labelFor } from "./config";
-import { notify } from "./notify";
+import { checkPin } from "./config";
+import { notifyChild, resolveDisplayName } from "./actions-helpers";
+import { notify } from "./push";
 import {
   HttpError,
   formatDateTime,
@@ -19,32 +20,20 @@ import {
   rewardWithLatePenalty,
   shouldHideExpiredTask,
   toNumber,
+  toText,
 } from "./util";
 
 const TASK_TITLE_MAX_LEN = 80;
 const TASK_CATEGORY_MAX_LEN = 40;
-
-function toTextCell(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
-    return String(value);
-  }
-  return "";
-}
 
 function composeTaskLabel(category: string, title: string): string {
   return [category, title].filter((s) => s && s.length > 0).join(" ");
 }
 
 function taskLabelFromRow(row: unknown[]): string {
-  const category = toTextCell(row[TASK_COL.CATEGORY]);
-  const title = toTextCell(row[TASK_COL.TITLE]);
+  const category = toText(row[TASK_COL.CATEGORY]);
+  const title = toText(row[TASK_COL.TITLE]);
   return composeTaskLabel(category, title);
-}
-
-function resolveDisplayName(env: Env, user: string): string {
-  const cfg = fetchConfig(env);
-  return labelFor(cfg.users, user);
 }
 
 function taskSheetFor(user: string): string {
@@ -53,15 +42,6 @@ function taskSheetFor(user: string): string {
 
 function historySheetFor(user: string): string {
   return SHEET_PREFIX.HISTORY + user;
-}
-
-async function notifyChild(
-  env: Env,
-  user: string,
-  subject: string,
-  body: string,
-): Promise<void> {
-  await notify(env, subject, body, "child", user);
 }
 
 async function notifyApply(
@@ -98,8 +78,8 @@ function parseTaskInput(input: {
   completeReward: unknown;
   expiry?: unknown;
 }): { category: string; title: string; completeReward: number; expiry: string } {
-  const category = toTextCell(input.category).trim();
-  const title = toTextCell(input.title).trim();
+  const category = toText(input.category).trim();
+  const title = toText(input.title).trim();
   if (!title) throw new HttpError(400, MSG.errTaskTitleMissing);
   if (!category) throw new HttpError(400, MSG.errTaskCategoryMissing);
   if (title.length > TASK_TITLE_MAX_LEN) {
@@ -112,7 +92,7 @@ function parseTaskInput(input: {
   if (!Number.isFinite(completeReward) || completeReward <= 0) {
     throw new HttpError(400, MSG.errInvalidAmount);
   }
-  const expiryRaw = toTextCell(input.expiry).trim();
+  const expiryRaw = toText(input.expiry).trim();
   const expiry = normalizeExpiry(expiryRaw);
   return { category, title, completeReward, expiry };
 }
@@ -166,7 +146,7 @@ export async function handleApplyTask(env: Env, user: string, taskId: string) {
 
   await casTaskStatus(env, token, tasksSheet, rowIndex, currentStatus, STATUS.SUBMITTED);
 
-  const displayName = resolveDisplayName(env, user);
+  const displayName = await resolveDisplayName(env, user);
   const notifyBody = buildApplyNotifyBody(displayName, {
     taskLabel,
     completeReward,
@@ -178,7 +158,7 @@ export async function handleApplyTask(env: Env, user: string, taskId: string) {
 }
 
 export async function handleApproveTask(env: Env, user: string, taskId: string, pin: unknown) {
-  checkPin(env, pin);
+  await checkPin(env, pin);
   if (!taskId) throw new HttpError(400, MSG.errTaskIdMissing);
 
   const token = await getAccessToken(env);
@@ -191,7 +171,7 @@ export async function handleApproveTask(env: Env, user: string, taskId: string, 
   if (currentStatus === STATUS.DELETED) throw new HttpError(409, MSG.errTaskAlreadyDeleted);
   if (currentStatus === STATUS.REQUESTED) {
     await casTaskStatus(env, token, tasksSheet, rowIndex, currentStatus, STATUS.PENDING);
-    const displayName = resolveDisplayName(env, user);
+    const displayName = await resolveDisplayName(env, user);
     const taskLabel = taskLabelFromRow(row);
     await notifyChild(
       env,
@@ -220,7 +200,7 @@ export async function handleApproveTask(env: Env, user: string, taskId: string, 
   await casTaskStatus(env, token, tasksSheet, rowIndex, currentStatus, STATUS.APPROVED);
   const balance = total + points;
 
-  const displayName = resolveDisplayName(env, user);
+  const displayName = await resolveDisplayName(env, user);
   await notifyChild(
     env,
     user,
@@ -242,7 +222,7 @@ export async function handleRejectTask(
   taskId: string,
   pin: unknown,
 ) {
-  checkPin(env, pin);
+  await checkPin(env, pin);
   if (!taskId) throw new HttpError(400, MSG.errTaskIdMissing);
 
   const token = await getAccessToken(env);
@@ -254,7 +234,7 @@ export async function handleRejectTask(
   }
 
   await casTaskStatus(env, token, tasksSheet, rowIndex, currentStatus, STATUS.RETURNED);
-  const displayName = resolveDisplayName(env, user);
+  const displayName = await resolveDisplayName(env, user);
   const taskLabel = taskLabelFromRow(row);
   await notifyChild(
     env,
@@ -299,7 +279,7 @@ export async function handleCreateTask(
   input: { category: unknown; title: unknown; completeReward: unknown; expiry?: unknown; role: unknown; pin: unknown },
 ) {
   const role = input.role === "parent" ? "parent" : "child";
-  if (role === "parent") checkPin(env, input.pin);
+  if (role === "parent") await checkPin(env, input.pin);
   const parsed = parseTaskInput(input);
   const status = role === "parent" ? STATUS.PENDING : STATUS.REQUESTED;
   const now = formatDateTime(new Date());
@@ -327,7 +307,7 @@ export async function handleCreateTask(
     task.updatedAt,
   ]);
   if (role === "child") {
-    const displayName = resolveDisplayName(env, user);
+    const displayName = await resolveDisplayName(env, user);
     await notifyRequest(env, user, displayName, composeTaskLabel(task.category, task.title), task.completeReward);
   }
   return { task };
@@ -339,7 +319,7 @@ export async function handleUpdateTask(
   taskId: string,
   input: { category: unknown; title: unknown; completeReward: unknown; expiry?: unknown; pin: unknown },
 ) {
-  checkPin(env, input.pin);
+  await checkPin(env, input.pin);
   if (!taskId) throw new HttpError(400, MSG.errTaskIdMissing);
   const parsed = parseTaskInput(input);
   const token = await getAccessToken(env);
@@ -359,7 +339,7 @@ export async function handleUpdateTask(
   return {
     taskId,
     task: {
-      id: toTextCell(row[TASK_COL.ID]),
+      id: toText(row[TASK_COL.ID]),
       status: currentStatus,
       category: parsed.category,
       title: parsed.title,
@@ -378,7 +358,7 @@ export async function handleDeleteTask(
   taskId: string,
   pin: unknown,
 ) {
-  checkPin(env, pin);
+  await checkPin(env, pin);
   if (!taskId) throw new HttpError(400, MSG.errTaskIdMissing);
   const token = await getAccessToken(env);
   const tasksSheet = taskSheetFor(user);

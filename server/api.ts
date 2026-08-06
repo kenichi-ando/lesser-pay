@@ -27,27 +27,10 @@ import {
 	rewardWithLatePenalty,
 	shouldHideExpiredTask,
 	toNumber,
+	toText,
 } from "./util";
 
 const SCOPE = "https://www.googleapis.com/auth/spreadsheets";
-
-function consumeApiError(_error: unknown): void {
-	if (_error === undefined) return;
-}
-
-function toText(v: unknown): string {
-	if (v == null) return "";
-	if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
-	if (typeof v === "bigint" || typeof v === "symbol") return String(v);
-	if (v instanceof Date) return String(v);
-	try {
-		const json = JSON.stringify(v);
-		return json ?? "";
-	} catch (err) {
-		consumeApiError(err);
-		return "";
-	}
-}
 
 // ---------------------------------------------------------------------------
 // OAuth — Service Account JWT → access_token
@@ -305,18 +288,7 @@ export async function readHistoryRows(
 		throw new HttpError(404, `History sheet not found: ${historySheet} (${res.status})`);
 	}
 	const { values = [] } = (await res.json()) as { values?: unknown[][] };
-	return values
-		.filter(
-			(r) =>
-				nonEmpty(r[HISTORY_COL.DATE]) ||
-				nonEmpty(r[HISTORY_COL.CONTENT]) ||
-				nonEmpty(r[HISTORY_COL.POINTS]),
-		)
-		.map((r) => ({
-			date: toDateTimeString(r[HISTORY_COL.DATE]),
-			content: toText(r[HISTORY_COL.CONTENT]),
-			points: toNumber(r[HISTORY_COL.POINTS]),
-		}));
+	return shapeHistory(values);
 }
 
 export async function appendHistoryRow(

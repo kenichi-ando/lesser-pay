@@ -41,7 +41,6 @@ interface LPStorageKeys {
   parentPin: string;
   parentMode: string;
   apiToken: string;
-  pushPromptDismissed: string;
   submittedSnapshot: string;
 }
 
@@ -67,9 +66,6 @@ interface LPStoreApi {
   getApiToken: () => string | null;
   setApiToken: (token: string) => void;
   clearApiToken: () => void;
-  getPushPromptDismissed: () => boolean;
-  setPushPromptDismissed: () => void;
-  clearPushPromptDismissed: () => void;
   getSubmittedSnapshot: (user: string) => string[];
   setSubmittedSnapshot: (user: string, ids: string[]) => void;
 }
@@ -157,7 +153,6 @@ interface LPUtilsApi {
   escapeHtml: (value: unknown) => string;
   parseDate: (source: unknown) => Date | null;
   formatDate: (source: unknown) => string;
-  isExpired: (source: unknown) => boolean;
   withBusy: LPWithBusy;
 }
 
@@ -270,7 +265,6 @@ interface LPRendererDeps {
   escapeHtml: (value: unknown) => string;
   parseDate: (source: unknown) => Date | null;
   formatDate: (source: unknown) => string;
-  isExpired: (source: unknown) => boolean;
   onTaskAction: (event: Event) => Promise<void>;
   labelOf: (key: string) => string;
 }

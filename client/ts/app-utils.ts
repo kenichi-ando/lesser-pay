@@ -124,20 +124,10 @@ async function withBusyState<T>(targets: UtilsBusyTargets, task: () => Promise<T
       return date.getFullYear() + '/' + m + '/' + d;
     }
 
-    function isExpired(source: unknown): boolean {
-      const date = parseDateValue(source);
-      if (!date) return false;
-      date.setHours(0, 0, 0, 0);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return date < today;
-    }
-
     return {
       escapeHtml: escapeHtmlText,
       parseDate: parseDateValue,
       formatDate: formatDate,
-      isExpired: isExpired,
       withBusy: function <T>(targets: UtilsBusyTargets, options: UtilsBusyOptions | undefined, task: () => Promise<T>) {
         return withBusyState(targets, task, options || {});
       }

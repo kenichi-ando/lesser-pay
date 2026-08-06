@@ -6,6 +6,8 @@
  * like in the spreadsheet UI. We only need column ORDER to match this file.
  */
 
+import { toText } from "./util";
+
 // Sheet naming. Spreadsheet tab names are case-sensitive, so the casing here
 // must match the actual tab names exactly (e.g. "Tasks_Light", "History_Light").
 export const SHEET_PREFIX = {
@@ -23,24 +25,6 @@ export const STATUS = {
 	APPROVED: "Approved",
 	DELETED: "Deleted",
 } as const;
-
-function consumeSchemaError(_error: unknown): void {
-	if (_error === undefined) return;
-}
-
-function toText(value: unknown): string {
-	if (value == null) return "";
-	if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
-	if (typeof value === "bigint" || typeof value === "symbol") return String(value);
-	if (value instanceof Date) return String(value);
-	try {
-		const json = JSON.stringify(value);
-		return json ?? "";
-	} catch (err) {
-		consumeSchemaError(err);
-		return "";
-	}
-}
 
 // Read a raw STATUS cell value. Blank → PENDING.
 export function normalizeStatus(raw: unknown): string {

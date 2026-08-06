@@ -1,8 +1,7 @@
 # LesserPay (レサペイ)
 
 家庭向けポイント管理アプリです。  
-この README は「初めて運用する人が、同じ構成を立ち上げるための手順書」です。  
-技術仕様や内部設計は [`ARCHITECTURE.md`](./ARCHITECTURE.md) を参照してください。
+この README は「初めて運用する人が、同じ構成を立ち上げるための手順書」です。
 
 ## 1. リポジトリを取得する
 
@@ -26,10 +25,26 @@ npx wrangler login
 
 ## 3. スプレッドシートを準備する
 
-1つのスプレッドシートを作成し、子どもごとに以下 2 タブを作成します。
+1つのスプレッドシートを作成し、次のタブを用意します。
 
-- `Tasks_<key>` 例: `Tasks_Light`
-- `History_<key>` 例: `History_Light`
+### `Users`（名簿）
+
+| A (key) | B (label) |
+|---------|-----------|
+| UserA | ユーザA |
+| UserB | ユーザB |
+| Debug | デバッグ用ユーザ |
+
+- `key` はシート名 `Tasks_<key>` / `History_<key>` と一致させる
+- `Debug` 行は任意（期限リマインドの cron 対象外）
+- 初回アクセス時にタブが無ければ Worker が作成するが、行は手動追加
+
+### 子どもごとのタスク / 履歴
+
+子どもごとに以下 2 タブを作成します。
+
+- `Tasks_<key>` 例: `Tasks_UserA`
+- `History_<key>` 例: `History_UserA`
 
 `Tasks_<key>` は A〜H 列で以下の順番にしてください:
 
@@ -74,23 +89,16 @@ npx wrangler secret put GOOGLE_SHEET_ID
 npx wrangler secret put INVITE_CODE
 npx wrangler secret put API_TOKEN
 npx wrangler secret put PARENT_PIN
-npx wrangler secret put USERS
 ```
 
 ### 任意 Secret
 
 ```bash
-# Debugユーザー表示切替: 1=有効, 0/未設定=無効
-npx wrangler secret put DEBUG
-
 # 通知を使う場合のみ（VAPID）
 npx wrangler secret put PUSH_VAPID_PUBLIC_KEY
 npx wrangler secret put PUSH_VAPID_PRIVATE_KEY
 npx wrangler secret put PUSH_SUBJECT
 ```
-
-`USERS` は `key:label` のカンマ区切りです（例: `Light:ライト, Tiara:ティアラ`）。
-`DEBUG` は `1` のときだけ `Debug User` を追加表示します。
 
 ## 6. デプロイする
 
@@ -137,15 +145,14 @@ npm run deploy
 - 子: タスク提案、完了報告
 - 期限超過タスク: 1日ごとに完了ポイントが10%ずつ減少し、10日超過で一覧から非表示
 - ユーザー追加/改名時:
+  - `Users` シートに行を追加/編集
   - `Tasks_<key>` / `History_<key>` タブを追加
-  - `USERS` secret を更新
-  - `npm run deploy`
+  - ログインユーザー切替（または再起動）で名簿を再読込
 
 ## 11. よく使う運用コマンド
 
 ```bash
 # Secret 更新
-npx wrangler secret put USERS
 npx wrangler secret put INVITE_CODE
 npx wrangler secret put API_TOKEN
 
@@ -162,7 +169,3 @@ npx wrangler tail
 - Service Account の `client_email` に編集権限を付けたか
 - `GOOGLE_SHEET_ID` が正しいか
 - 家族がホーム画面アイコンから起動しているか（iOS 通知の重要条件）
-
----
-
-実装詳細・データモデル・通知の内部仕様は [`ARCHITECTURE.md`](./ARCHITECTURE.md) に集約しています。

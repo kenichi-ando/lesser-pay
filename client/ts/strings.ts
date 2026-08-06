@@ -121,7 +121,7 @@ const STRINGS = {
     confirm: '「{label}」に {amount} pt をあげます。よろしいですか？',
     toast: '🎁 {amount} pt をあげました'
   },
-  setup: { needUsers: 'USERS シークレット (wrangler secret put USERS) を設定してください' },
+  setup: { needUsers: 'Users シートにユーザーを追加してください（A列=key / B列=表示名）' },
   locked: {
     title: '🔒 アクセスできません',
     desc: '家族から教わった招待コードを入力してね。',

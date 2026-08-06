@@ -18,9 +18,6 @@
       getApiToken: function () { return localStorage.getItem(sk.apiToken); },
       setApiToken: function (token) { localStorage.setItem(sk.apiToken, token); },
       clearApiToken: function () { localStorage.removeItem(sk.apiToken); },
-      getPushPromptDismissed: function () { return localStorage.getItem(sk.pushPromptDismissed) === '1'; },
-      setPushPromptDismissed: function () { localStorage.setItem(sk.pushPromptDismissed, '1'); },
-      clearPushPromptDismissed: function () { localStorage.removeItem(sk.pushPromptDismissed); },
       getSubmittedSnapshot: function (user) {
         const raw = localStorage.getItem(sk.submittedSnapshot + '_' + user);
         const parsed: unknown = JSON.parse(raw || '[]');

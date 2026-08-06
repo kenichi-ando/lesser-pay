@@ -5,7 +5,6 @@ interface StorageKeys {
   parentPin: string;
   parentMode: string;
   apiToken: string;
-  pushPromptDismissed: string;
   submittedSnapshot: string;
 }
 
@@ -28,7 +27,6 @@ window.LESSERPAY_CONFIG = {
     parentMode:  'lesserpay_parent_mode',  // "1" when current session should stay in parent mode.
     apiToken:    'lesserpay_api_token',    // Long bearer token returned by `redeemInvite`. Sent
                                          // as Authorization: Bearer on every /api call.
-    pushPromptDismissed: 'lesserpay_push_prompt_dismissed',
     // Per-user list of task IDs that were Submitted at the last loadData. On
     // the next load, any of these that are now Approved triggers a kid-side
     // celebration. Persisted so it survives app close/reopen — that's the

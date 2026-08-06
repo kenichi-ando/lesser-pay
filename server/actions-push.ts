@@ -5,17 +5,6 @@ import {
   upsertPushSubscription,
 } from "./push";
 
-async function savePushSubscription(
-  env: Env,
-  user: string,
-  subscription: unknown,
-  role: unknown,
-  deviceLabel: unknown,
-): Promise<void> {
-  const normalized = normalizePushSubscription(subscription);
-  await upsertPushSubscription(env, user, normalized, role, deviceLabel);
-}
-
 export async function handleSubscribePush(
   env: Env,
   user: string,
@@ -23,7 +12,7 @@ export async function handleSubscribePush(
   role: unknown,
   deviceLabel: unknown,
 ) {
-  await savePushSubscription(env, user, subscription, role, deviceLabel);
+  await upsertPushSubscription(env, user, normalizePushSubscription(subscription), role, deviceLabel);
   return { subscribed: true };
 }
 

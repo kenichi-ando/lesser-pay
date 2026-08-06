@@ -2,34 +2,12 @@ import type { Env } from "./env";
 import { SHEET_PREFIX, HISTORY_LABEL } from "./schema";
 import { MSG, fmt } from "./messages";
 import { appendHistoryRow, getAccessToken, readHistoryRows } from "./api";
-import { checkPin, fetchConfig, labelFor } from "./config";
-import { notify } from "./notify";
-import { HttpError, formatDateTime, toNumber } from "./util";
+import { checkPin } from "./config";
+import { notifyChild, resolveDisplayName } from "./actions-helpers";
+import { HttpError, formatDateTime, toNumber, toText } from "./util";
 
 const BONUS_LABEL_MAX_LEN = 80;
 const CASHOUT_MEMO_MAX_LEN = 80;
-
-function toTextCell(value: unknown): string {
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
-    return String(value);
-  }
-  return "";
-}
-
-function resolveDisplayName(env: Env, user: string): string {
-  const cfg = fetchConfig(env);
-  return labelFor(cfg.users, user);
-}
-
-async function notifyChild(
-  env: Env,
-  user: string,
-  subject: string,
-  body: string,
-): Promise<void> {
-  await notify(env, subject, body, "child", user);
-}
 
 async function readBalance(env: Env, token: string, historySheet: string): Promise<number> {
   const rows = await readHistoryRows(env, token, historySheet);
@@ -61,9 +39,9 @@ export async function handleCashout(
   memoRaw: unknown,
   pin: unknown,
 ) {
-  checkPin(env, pin);
+  await checkPin(env, pin);
   const amt = parsePositiveAmount(amount);
-  const memo = toTextCell(memoRaw).trim();
+  const memo = toText(memoRaw).trim();
   if (memo.length > CASHOUT_MEMO_MAX_LEN) {
     throw new HttpError(400, fmt(MSG.errCashoutMemoTooLong, { max: CASHOUT_MEMO_MAX_LEN }));
   }
@@ -83,7 +61,7 @@ export async function handleCashout(
   );
   const balance = total - amt;
 
-  const displayName = resolveDisplayName(env, user);
+  const displayName = await resolveDisplayName(env, user);
   await notifyChild(
     env,
     user,
@@ -105,9 +83,9 @@ export async function handleGrantBonus(
   amount: unknown,
   pin: unknown,
 ) {
-  checkPin(env, pin);
+  await checkPin(env, pin);
   const amt = parsePositiveAmount(amount);
-  const label = toTextCell(labelRaw).trim();
+  const label = toText(labelRaw).trim();
   if (!label) throw new HttpError(400, MSG.errBonusLabelMissing);
   if (label.length > BONUS_LABEL_MAX_LEN) {
     throw new HttpError(400, fmt(MSG.errBonusLabelTooLong, { max: BONUS_LABEL_MAX_LEN }));
@@ -126,7 +104,7 @@ export async function handleGrantBonus(
   );
   const balance = total + amt;
 
-  const displayName = resolveDisplayName(env, user);
+  const displayName = await resolveDisplayName(env, user);
   await notifyChild(
     env,
     user,

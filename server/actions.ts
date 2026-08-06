@@ -98,7 +98,8 @@ export const ACTIONS: Record<ServerActionName, ActionDef> = {
 // ---------------------------------------------------------------------------
 
 async function handleGetConfig(env: Env) {
-	const cfg = fetchConfig(env);
+	// Always bypass users cache so login switch / bootstrap see the latest roster.
+	const cfg = await fetchConfig(env, { force: true });
 	return {
 		users: cfg.users,
 		status: STATUS,
@@ -116,6 +117,6 @@ async function handleGetData(env: Env, user: string) {
 }
 
 async function handleVerifyPin(env: Env, pin: unknown) {
-	checkPin(env, pin);
+	await checkPin(env, pin);
 	return { verified: true };
 }

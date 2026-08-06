@@ -21,11 +21,7 @@ export function nonEmpty(v: unknown): boolean {
 	return v != null && v !== "";
 }
 
-function consumeUtilError(_error: unknown): void {
-	if (_error === undefined) return;
-}
-
-function toDisplayString(v: unknown): string {
+export function toText(v: unknown): string {
 	if (v == null) return "";
 	if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
 	if (typeof v === "bigint" || typeof v === "symbol") return String(v);
@@ -33,8 +29,7 @@ function toDisplayString(v: unknown): string {
 	try {
 		const json = JSON.stringify(v);
 		return json ?? "";
-	} catch (err) {
-		consumeUtilError(err);
+	} catch {
 		return "";
 	}
 }
@@ -57,7 +52,7 @@ export function toNumber(v: unknown): number {
 // dateTimeRenderOption=FORMATTED_STRING when reading.
 export function toDateString(v: unknown): string {
 	if (v == null || v === "") return "";
-	return toDisplayString(v);
+	return toText(v);
 }
 
 export function toDateTimeString(v: unknown): string {
@@ -71,24 +66,7 @@ export function toDateTimeString(v: unknown): string {
 		const ms = epoch + v * 86400 * 1000;
 		return formatDateTime(new Date(ms));
 	}
-	return toDisplayString(v);
-}
-
-// Today (Asia/Tokyo) at 00:00 in epoch ms. Used to compare against EXPIRY.
-// Workers run in UTC; we hard-code Tokyo because the spreadsheet authoring
-// audience is Japan. Good enough until proven otherwise.
-export function todayTokyoStart(): number {
-	const now = new Date();
-	const tokyo = new Date(now.getTime() + 9 * 3600 * 1000);
-	tokyo.setUTCHours(0, 0, 0, 0);
-	return tokyo.getTime() - 9 * 3600 * 1000;
-}
-
-export function isExpired(v: unknown): boolean {
-	if (v == null || v === "") return false;
-	const parsed = new Date(toDisplayString(v));
-	if (Number.isNaN(parsed.getTime())) return false;
-	return parsed.getTime() < todayTokyoStart();
+	return toText(v);
 }
 
 function parseDateLike(v: unknown): Date | null {
@@ -106,7 +84,7 @@ function parseDateLike(v: unknown): Date | null {
 	return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
-function toJstDateParts(source: Date): { y: number; m: number; d: number } {
+export function toJstDateParts(source: Date): { y: number; m: number; d: number } {
 	const jst = new Date(source.getTime() + 9 * 60 * 60 * 1000);
 	return {
 		y: jst.getUTCFullYear(),
