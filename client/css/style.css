@@ -1265,7 +1265,7 @@ body {
   width: 64px;
   height: 64px;
   margin: 0 auto 8px;
-  background-image: url("../icons/lesser-panda-face.png");
+  background-image: url("/icons/lesser-panda-face.png");
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
