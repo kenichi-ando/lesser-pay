@@ -28,6 +28,7 @@ import {
 	toNumber,
 	toText,
 } from "./util";
+import { ensureColumnNumberFormat } from "./sheets";
 
 const SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
@@ -112,6 +113,7 @@ export async function readUserData(
 	history: ReturnType<typeof shapeHistory>;
 }> {
 	const token = await getAccessToken(env);
+	await ensureRewardColumnsAreNumbers(env, token, tasksSheet);
 
 	const tasksRange = `${tasksSheet}!A2:${TASK_LAST_COL_LETTER}`;
 	const historyRange = `${historySheet}!A2:${HISTORY_LAST_COL_LETTER}`;
@@ -190,7 +192,7 @@ async function batchUpdateValues(env: Env, token: string, updates: ValueUpdate[]
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({
-			valueInputOption: "USER_ENTERED",
+			valueInputOption: "RAW",
 			data: updates.map((u) => ({ range: u.range, values: [[u.value]] })),
 		}),
 	});
@@ -256,7 +258,7 @@ export async function casTaskStatus(
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({
-			valueInputOption: "USER_ENTERED",
+			valueInputOption: "RAW",
 			data: [
 				{
 					range: cell,
@@ -355,6 +357,7 @@ export async function appendTaskRow(
 	if (!writeRes.ok) {
 		throw new HttpError(502, `Task append failed: ${writeRes.status} ${await writeRes.text()}`);
 	}
+	await ensureRewardColumnsAreNumbers(env, token, tasksSheet);
 }
 
 export async function updateTaskRow(
@@ -377,13 +380,24 @@ export async function updateTaskRow(
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({
-			valueInputOption: "USER_ENTERED",
+			valueInputOption: "RAW",
 			data: updates,
 		}),
 	});
 	if (!res.ok) {
 		throw new HttpError(502, `Task update failed: ${res.status} ${await res.text()}`);
 	}
+	await ensureRewardColumnsAreNumbers(env, token, tasksSheet);
+}
+
+async function ensureRewardColumnsAreNumbers(env: Env, token: string, tasksSheet: string) {
+	await ensureColumnNumberFormat(
+		env,
+		token,
+		tasksSheet,
+		TASK_COL.SUBMIT_REWARD,
+		TASK_COL.COMPLETE_REWARD + 1,
+	);
 }
 
 // ---------------------------------------------------------------------------

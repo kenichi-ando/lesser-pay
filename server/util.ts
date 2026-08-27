@@ -42,9 +42,32 @@ export function constantTimeEqual(a: string, b: string): boolean {
 	return diff === 0;
 }
 
+// Sheets date serial 0 = 1899-12-30. A number cell formatted as a date
+// (e.g. points 2000 → 1905/06/22) comes back as that string when we read
+// with dateTimeRenderOption=FORMATTED_STRING.
+const SHEETS_EPOCH_UTC_MS = Date.UTC(1899, 11, 30);
+
 export function toNumber(v: unknown): number {
+	if (typeof v === "number" && Number.isFinite(v)) return v;
+	if (typeof v === "string") {
+		const n = Number(v);
+		if (Number.isFinite(n)) return n;
+		const serial = sheetsSerialFromDateString(v);
+		if (serial != null) return serial;
+	}
 	const n = Number(v);
 	return Number.isFinite(n) ? n : 0;
+}
+
+function sheetsSerialFromDateString(v: string): number | null {
+	const m = /^(\d{4})\/(\d{2})\/(\d{2})(?:$|\s)/.exec(v.trim());
+	if (!m || !m[1] || !m[2] || !m[3]) return null;
+	const y = Number(m[1]);
+	const mo = Number(m[2]);
+	const d = Number(m[3]);
+	if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+	const ms = Date.UTC(y, mo - 1, d);
+	return Math.round((ms - SHEETS_EPOCH_UTC_MS) / 86_400_000);
 }
 
 // Expiry / date cells: pass through "yyyy/MM/dd" as-is. Sheets returns date
@@ -62,8 +85,7 @@ export function toDateTimeString(v: unknown): string {
 	// 1899/12/30). Decode those rows on read so the UI stays clean. New rows
 	// are written RAW and arrive here as strings, hitting the early return.
 	if (typeof v === "number" && Number.isFinite(v)) {
-		const epoch = Date.UTC(1899, 11, 30); // Sheets epoch in UTC ms
-		const ms = epoch + v * 86400 * 1000;
+		const ms = SHEETS_EPOCH_UTC_MS + v * 86400 * 1000;
 		return formatDateTime(new Date(ms));
 	}
 	return toText(v);
