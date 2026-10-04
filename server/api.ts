@@ -24,7 +24,6 @@ import {
 	nonEmpty,
 	toDateString,
 	toDateTimeString,
-	rewardWithLatePenalty,
 	toNumber,
 	toText,
 } from "./util";
@@ -405,7 +404,6 @@ async function ensureRewardColumnsAreNumbers(env: Env, token: string, tasksSheet
 // ---------------------------------------------------------------------------
 
 function shapeTasks(rows: unknown[][]) {
-	const now = new Date();
 	return rows
 		.filter((r) => nonEmpty(r[TASK_COL.ID]) && nonEmpty(r[TASK_COL.TITLE]))
 		.filter((r) => {
@@ -415,13 +413,7 @@ function shapeTasks(rows: unknown[][]) {
 		})
 		.map((r) => {
 			const status = normalizeStatus(r[TASK_COL.STATUS]);
-			const baseCompleteReward = toNumber(r[TASK_COL.COMPLETE_REWARD]);
-			const rewardReference =
-				status === STATUS.SUBMITTED ? r[TASK_COL.UPDATED_AT] : now;
-			const completeReward =
-				status === STATUS.APPROVED
-					? baseCompleteReward
-					: rewardWithLatePenalty(baseCompleteReward, r[TASK_COL.EXPIRY], rewardReference);
+			const completeReward = toNumber(r[TASK_COL.COMPLETE_REWARD]);
 			return ({
 			id: toText(r[TASK_COL.ID]),
 			status,

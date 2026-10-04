@@ -17,7 +17,6 @@ import {
   HttpError,
   formatDateTime,
   generateTaskId,
-  rewardWithLatePenalty,
   toNumber,
   toText,
 } from "./util";
@@ -124,11 +123,7 @@ export async function handleApplyTask(env: Env, user: string, taskId: string) {
   if (currentStatus === STATUS.DELETED) throw new HttpError(409, MSG.errTaskAlreadyDeleted);
 
   const submitReward = toNumber(row[TASK_COL.SUBMIT_REWARD]);
-  const completeReward = rewardWithLatePenalty(
-    toNumber(row[TASK_COL.COMPLETE_REWARD]),
-    row[TASK_COL.EXPIRY],
-    new Date(),
-  );
+  const completeReward = toNumber(row[TASK_COL.COMPLETE_REWARD]);
   const taskLabel = taskLabelFromRow(row);
   const isFirstSubmit = currentStatus !== STATUS.RETURNED;
 
@@ -182,11 +177,7 @@ export async function handleApproveTask(env: Env, user: string, taskId: string, 
   }
 
   const taskLabel = taskLabelFromRow(row);
-  const points = rewardWithLatePenalty(
-    toNumber(row[TASK_COL.COMPLETE_REWARD]),
-    row[TASK_COL.EXPIRY],
-    row[TASK_COL.UPDATED_AT],
-  );
+  const points = toNumber(row[TASK_COL.COMPLETE_REWARD]);
   const content = HISTORY_LABEL.APPROVE_PREFIX + taskLabel;
 
   const rows = await readHistoryRows(env, token, historySheet);
